@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import type { Env } from '../../config/env.validation.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
@@ -12,6 +13,19 @@ import { RolesGuard } from './guards/roles.guard.js';
 @Module({
   imports: [
     UsersModule,
+    // Used only by the public auth routes (@UseGuards(ThrottlerGuard) in the controller).
+    // Counters live in memory, per process and per client IP.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => ({
+        throttlers: [
+          {
+            ttl: 60_000,
+            limit: config.get('AUTH_RATE_LIMIT', { infer: true }),
+          },
+        ],
+      }),
+    }),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>): JwtModuleOptions => ({

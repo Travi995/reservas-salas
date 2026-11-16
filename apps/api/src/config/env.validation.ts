@@ -13,6 +13,7 @@ export interface Env {
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
   LOG_FORMAT: 'pretty' | 'json';
+  AUTH_RATE_LIMIT: number;
 }
 
 export const envSchema = Joi.object<Env, true>({
@@ -46,6 +47,8 @@ export const envSchema = Joi.object<Env, true>({
     }),
   // `json` = one JSON object per line (log collectors); `pretty` = readable lines in development.
   LOG_FORMAT: Joi.string().valid('pretty', 'json').default('pretty'),
+  // Login + register attempts allowed per IP per minute (brute force / mass sign-up protection).
+  AUTH_RATE_LIMIT: Joi.number().integer().min(1).default(10),
 });
 
 /**
