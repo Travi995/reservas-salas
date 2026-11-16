@@ -6,6 +6,7 @@ import type { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
+import { Room } from '../../src/modules/rooms/entities/room.entity.js';
 import { User } from '../../src/modules/users/entities/user.entity.js';
 import { Role } from '../../src/modules/users/enums/role.enum.js';
 
@@ -56,7 +57,30 @@ export async function loginAs(
     role,
   });
   const res = await request(ctx.app.getHttpServer())
-    .post('/api/auth/login')
+    .post('/api/v1/auth/login')
     .send({ email, password: 'password123' });
   return { user, token: res.body.accessToken as string };
+}
+
+const BUENOS_AIRES = 'America/Argentina/Buenos_Aires';
+
+/** Calendar date `days` from today in the given zone, as "YYYY-MM-DD". */
+export function dateIn(days: number, timeZone = BUENOS_AIRES): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.now() + days * 86_400_000));
+  return parts;
+}
+
+export async function createRoom(db: DataSource, data: Partial<Room> = {}) {
+  return db.getRepository(Room).save({
+    name: 'Sala Andes',
+    capacity: 8,
+    location: 'Oficina Centro',
+    timezone: BUENOS_AIRES,
+    ...data,
+  });
 }
