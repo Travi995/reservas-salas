@@ -1,15 +1,26 @@
-import { Controller, useForm } from 'react-hook-form'
-import { Button, DatePicker, Dialog, InputField, Select } from '../../components/ui'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Button, Checkbox, DatePicker, Dialog, InputField, Select } from '../../components/ui'
 import { api } from '../../lib/api'
 import { applyApiError, rules } from '../../lib/forms'
 import { notify } from '../../lib/notify'
-import { isInPast, MAX_MINUTES, MIN_MINUTES, todayISO, toMinutes } from '../../lib/time'
+import {
+  formatPlainDate,
+  isInPast,
+  MAX_MINUTES,
+  MAX_WEEKS,
+  MIN_MINUTES,
+  MIN_WEEKS,
+  todayISO,
+  toMinutes,
+  weeklyDates,
+} from '../../lib/time'
 import type { ReservationInput, Room } from '../../lib/types'
 
 interface ReservationDialogProps {
   open: boolean
   rooms: Room[]
-  initial: { roomId: string; date: string }
+  /** Pre-filled values; the weekly calendar also passes the clicked hour. */
+  initial: { roomId: string; date: string; startTime?: string; endTime?: string }
   onClose: () => void
   onCreated: () => void
 }
@@ -19,7 +30,7 @@ export function ReservationDialog({ open, rooms, initial, onClose, onCreated }: 
     <Dialog open={open} onClose={onClose} title="Nueva reserva">
       {/* key: resets the form each time it opens with a different room/date */}
       <ReservationForm
-        key={`${initial.roomId}-${initial.date}-${open}`}
+        key={`${initial.roomId}-${initial.date}-${initial.startTime}-${open}`}
         rooms={rooms}
         initial={initial}
         onClose={onClose}
@@ -29,7 +40,12 @@ export function ReservationDialog({ open, rooms, initial, onClose, onCreated }: 
   )
 }
 
-const FIELDS = ['roomId', 'date', 'startTime', 'endTime', 'title'] as const
+interface ReservationFormValues extends ReservationInput {
+  repeat: boolean
+  weeks: number
+}
+
+const FIELDS = ['roomId', 'date', 'startTime', 'endTime', 'title', 'weeks'] as const
 
 function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<ReservationDialogProps, 'open'>) {
   const {
@@ -39,17 +55,28 @@ function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<Reservatio
     setError,
     getValues,
     formState: { errors, isSubmitting },
-  } = useForm<ReservationInput>({
+  } = useForm<ReservationFormValues>({
     mode: 'onTouched',
-    defaultValues: { ...initial, startTime: '', endTime: '', title: '' },
+    defaultValues: { startTime: '', endTime: '', ...initial, title: '', repeat: false, weeks: 4 },
   })
+
+  const [repeat, weeks, date] = useWatch({ control, name: ['repeat', 'weeks', 'date'] })
+  const validWeeks = Number.isInteger(weeks) && weeks >= MIN_WEEKS && weeks <= MAX_WEEKS
+  const seriesDates = repeat && date && validWeeks ? weeklyDates(date, weeks) : []
 
   const roomOf = (id: string) => rooms.find((r) => r.id === id)
 
-  const onSubmit = handleSubmit(async (values) => {
+  const onSubmit = handleSubmit(async ({ repeat, weeks, ...values }) => {
+    const input = { ...values, title: values.title.trim() }
     try {
-      await api.createReservation({ ...values, title: values.title.trim() })
-      notify.success('Reserva creada.')
+      if (repeat) {
+        // All or nothing: if any week clashes the API creates none and lists the dates (toast).
+        const { reservations } = await api.createRecurringReservation({ ...input, weeks })
+        notify.success(`Serie creada: ${reservations.length} reservas semanales.`)
+      } else {
+        await api.createReservation(input)
+        notify.success('Reserva creada.')
+      }
       onCreated()
     } catch (err) {
       applyApiError(err, setError, FIELDS)
@@ -125,13 +152,42 @@ function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<Reservatio
           maxLength: { value: 120, message: 'Máximo 120 caracteres.' },
         })}
       />
+      <Checkbox
+        label="Repetir cada semana"
+        hint="Mismo día y horario. Si alguna semana choca, no se crea ninguna."
+        {...register('repeat')}
+      />
+      {repeat && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
+          <InputField
+            label="Durante cuántas semanas"
+            type="number"
+            inputMode="numeric"
+            min={MIN_WEEKS}
+            max={MAX_WEEKS}
+            error={errors.weeks?.message}
+            {...register('weeks', {
+              valueAsNumber: true,
+              validate: (v) =>
+                (Number.isInteger(v) && v >= MIN_WEEKS && v <= MAX_WEEKS) ||
+                `Entre ${MIN_WEEKS} y ${MAX_WEEKS} semanas.`,
+            })}
+          />
+          {seriesDates.length > 0 && (
+            <p className="text-sm text-muted-fg" aria-live="polite">
+              <span className="font-medium text-fg">{seriesDates.length} reservas:</span>{' '}
+              {seriesDates.map((d) => formatPlainDate(d)).join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
       <p className="text-sm text-muted-fg">Entre 15 minutos y 4 horas, en el horario de la sala.</p>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
         <Button type="submit" loading={isSubmitting}>
-          Reservar
+          {repeat && validWeeks ? `Reservar ${weeks} semanas` : 'Reservar'}
         </Button>
       </div>
     </form>
