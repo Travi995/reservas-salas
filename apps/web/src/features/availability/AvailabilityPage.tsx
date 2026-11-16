@@ -1,22 +1,13 @@
 import { CalendarX2, ChevronLeft, ChevronRight, SearchX } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
-import {
-  Alert,
-  Button,
-  ConfirmDialog,
-  EmptyState,
-  DatePicker,
-  PageHeader,
-  PageLoader,
-  Select,
-} from '../../components/ui'
+import { Button, EmptyState, ErrorState, DatePicker, PageHeader, PageLoader, Select } from '../../components/ui'
 import { api } from '../../lib/api'
-import { notify } from '../../lib/notify'
 import { useAuth } from '../../lib/auth'
-import { formatLongDate, formatTime, todayISO } from '../../lib/time'
+import { formatLongDate, isISODate, nowIn, todayISO } from '../../lib/time'
 import type { ReservationSlot, Room } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
+import { CancelReservationDialog } from '../reservations/CancelReservationDialog'
 import { ReservationDialog } from '../reservations/ReservationDialog'
 import { RoomDayCard } from './RoomDayCard'
 import { Stagger, StaggerItem } from '../../components/motion'
@@ -36,7 +27,9 @@ export function AvailabilityPage() {
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const today = todayISO()
-  const date = params.get('fecha') ?? today
+  // A hand-edited or mistyped ?fecha= falls back to today instead of breaking the page.
+  const rawDate = params.get('fecha')
+  const date = isISODate(rawDate) ? rawDate : today
   const minCapacity = Number(params.get('capacidad')) || 0
 
   const { data, error, loading, reload } = useAsync(
@@ -44,7 +37,7 @@ export function AvailabilityPage() {
     [date, minCapacity],
   )
 
-  const [booking, setBooking] = useState<{ roomId: string } | null>(null)
+  const [booking, setBooking] = useState<{ roomId: string; date: string } | null>(null)
   const [cancelling, setCancelling] = useState<{ slot: ReservationSlot; room: Room } | null>(null)
 
   const update = (key: string, value: string) => {
@@ -99,12 +92,7 @@ export function AvailabilityPage() {
       {loading && !data ? (
         <PageLoader />
       ) : error ? (
-        <Alert>
-          {error.message}{' '}
-          <button type="button" onClick={reload} className="font-semibold underline">
-            Reintentar
-          </button>
-        </Alert>
+        <ErrorState message={error.message} onRetry={reload} />
       ) : rooms.length === 0 ? (
         minCapacity ? (
           <EmptyState icon={SearchX} title={`No hay salas para ${minCapacity} personas o más`}>
@@ -126,7 +114,11 @@ export function AvailabilityPage() {
                 room={room}
                 slots={reservations}
                 user={user!}
-                onReserve={() => setBooking({ roomId: room.id })}
+                onReserve={() => {
+                  // Never earlier than the room's own today (it can differ from the browser's).
+                  const roomToday = nowIn(room.timezone).date
+                  setBooking({ roomId: room.id, date: date < roomToday ? roomToday : date })
+                }}
                 onCancel={(slot) => setCancelling({ slot, room })}
               />
             </StaggerItem>
@@ -137,33 +129,26 @@ export function AvailabilityPage() {
       <ReservationDialog
         open={booking !== null}
         rooms={rooms.map((r) => r.room)}
-        initial={{ roomId: booking?.roomId ?? '', date: date < today ? today : date }}
+        initial={{ roomId: booking?.roomId ?? '', date: booking?.date ?? date }}
         onClose={() => setBooking(null)}
         onCreated={() => {
           setBooking(null)
           reload()
         }}
+        onConflict={reload}
       />
 
-      <ConfirmDialog
-        open={cancelling !== null}
-        title="Cancelar reserva"
-        confirmLabel="Cancelar reserva"
+      <CancelReservationDialog
+        reservation={
+          cancelling && {
+            ...cancelling.slot,
+            room: cancelling.room,
+            ownerName: cancelling.slot.userId === user?.id ? undefined : cancelling.slot.userName,
+          }
+        }
         onClose={() => setCancelling(null)}
-        onConfirm={async () => {
-          await api.cancelReservation(cancelling!.slot.id)
-          notify.success('Reserva cancelada.')
-          reload()
-        }}
-      >
-        {cancelling && (
-          <p>
-            «{cancelling.slot.title}» en {cancelling.room.name}, de{' '}
-            {formatTime(cancelling.slot.startsAt, cancelling.room.timezone)} a{' '}
-            {formatTime(cancelling.slot.endsAt, cancelling.room.timezone)}. El horario quedará libre.
-          </p>
-        )}
-      </ConfirmDialog>
+        onDone={reload}
+      />
     </>
   )
 }

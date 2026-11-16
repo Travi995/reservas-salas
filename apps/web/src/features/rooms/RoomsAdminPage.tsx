@@ -1,8 +1,19 @@
-import { DoorOpen, MapPin, Pencil, Plus, Users } from 'lucide-react'
+import { Clock, DoorOpen, MapPin, Pencil, Plus, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, PageHeader, PageLoader, cn } from '../../components/ui'
-import { api } from '../../lib/api'
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  PageLoader,
+  cn,
+} from '../../components/ui'
+import { ApiError, api } from '../../lib/api'
 import { notify } from '../../lib/notify'
+import { zoneCity } from '../../lib/time'
 import type { Room } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
 import { RoomFormDialog } from './RoomFormDialog'
@@ -14,7 +25,7 @@ export function RoomsAdminPage() {
   const [toggling, setToggling] = useState<Room | null>(null)
 
   const rooms = [...(data ?? [])].sort(
-    (a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name),
+    (a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
   )
 
   return (
@@ -32,7 +43,7 @@ export function RoomsAdminPage() {
       {loading && !data ? (
         <PageLoader />
       ) : error ? (
-        <Alert>{error.message}</Alert>
+        <ErrorState message={error.message} onRetry={reload} />
       ) : rooms.length === 0 ? (
         <EmptyState icon={DoorOpen} title="Todavía no hay salas">
           Crea la primera con «Nueva sala».
@@ -55,6 +66,9 @@ export function RoomsAdminPage() {
                       <MapPin aria-hidden="true" className="size-4 shrink-0" />{' '}
                       <span className="truncate">{room.location}</span>
                     </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock aria-hidden="true" className="size-4" /> Hora de {zoneCity(room.timezone)}
+                    </span>
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -63,6 +77,7 @@ export function RoomsAdminPage() {
                     size="sm"
                     onClick={() => setEditing({ room })}
                     className="flex-1 sm:flex-none"
+                    aria-label={`Editar ${room.name}`}
                   >
                     <Pencil aria-hidden="true" className="size-4" /> Editar
                   </Button>
@@ -71,6 +86,7 @@ export function RoomsAdminPage() {
                     size="sm"
                     onClick={() => setToggling(room)}
                     className="flex-1 sm:flex-none"
+                    aria-label={`${room.isActive ? 'Desactivar' : 'Activar'} ${room.name}`}
                   >
                     {room.isActive ? 'Desactivar' : 'Activar'}
                   </Button>
@@ -90,24 +106,41 @@ export function RoomsAdminPage() {
           setEditing(null)
           reload()
         }}
+        onStale={reload}
       />
 
       <ConfirmDialog
         open={toggling !== null}
-        title={toggling?.isActive ? 'Desactivar sala' : 'Activar sala'}
-        confirmLabel={toggling?.isActive ? 'Desactivar' : 'Activar'}
+        title={toggling?.isActive ? `¿Desactivar «${toggling.name}»?` : `¿Activar «${toggling?.name}»?`}
+        confirmLabel={toggling?.isActive ? 'Sí, desactivar sala' : 'Sí, activar sala'}
+        cancelLabel={toggling?.isActive ? 'No, dejarla activa' : 'No, dejarla inactiva'}
         tone={toggling?.isActive ? 'danger' : 'primary'}
         onClose={() => setToggling(null)}
         onConfirm={async () => {
-          const room = await api.updateRoom(toggling!.id, { isActive: !toggling!.isActive })
-          notify.success(`Sala «${room.name}» ${room.isActive ? 'activada' : 'desactivada'}.`)
+          try {
+            const room = await api.updateRoom(toggling!.id, {
+              isActive: !toggling!.isActive,
+              version: toggling!.version,
+            })
+            notify.success(`Sala «${room.name}» ${room.isActive ? 'activada' : 'desactivada'}.`)
+          } catch (e) {
+            // Changed by another admin meanwhile: refresh the list behind before showing the error.
+            if (e instanceof ApiError && e.code === 'ROOM_MODIFIED') reload()
+            throw e
+          }
           reload()
         }}
       >
         {toggling?.isActive ? (
-          <p>«{toggling.name}» dejará de aceptar reservas nuevas. Las reservas pasadas se seguirán viendo.</p>
+          <div className="flex flex-col gap-2">
+            <p>Dejará de aceptar reservas nuevas y no aparecerá en Disponibilidad.</p>
+            <p>
+              Las reservas que ya tiene <strong className="text-fg">se mantienen</strong> (las futuras también): si no
+              deben celebrarse, cancélalas una a una en Reservas. Puedes volver a activarla cuando quieras.
+            </p>
+          </div>
         ) : (
-          <p>«{toggling?.name}» volverá a aceptar reservas.</p>
+          <p>Volverá a aceptar reservas y a aparecer en Disponibilidad.</p>
         )}
       </ConfirmDialog>
     </>

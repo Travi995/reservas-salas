@@ -13,6 +13,7 @@ import {
   cn,
 } from '../../components/ui'
 import { api } from '../../lib/api'
+import { useAuth } from '../../lib/auth'
 import { formatDate, formatTime, zoneLabel } from '../../lib/time'
 import type { Reservation, ReservationScope } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function MyReservationsPage() {
   // Tab and page live in the URL (?tab=past&page=2): reload, back/forward and shared links keep them.
+  const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const tab: Tab = params.get('tab') === 'past' ? 'past' : 'upcoming'
   const page = pageFromParams(params)
@@ -96,8 +98,12 @@ export function MyReservationsPage() {
                 className="absolute inset-0 -z-10 rounded-md bg-surface shadow-sm"
               />
             )}
-            {t.label}{' '}
-            {tab === t.id && fresh && <span className="text-muted-fg tabular-nums">({fresh.meta.totalItems})</span>}
+            {t.label} {/* Cancelled ones stay listed (marked), but are not «próximas»: the counter leaves them out. */}
+            {tab === t.id && fresh && (
+              <span className="text-muted-fg tabular-nums">
+                ({t.id === 'upcoming' ? fresh.meta.activeItems : fresh.meta.totalItems})
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -135,7 +141,7 @@ export function MyReservationsPage() {
             >
               {items.map((r) => (
                 <StaggerItem as="li" key={r.id}>
-                  <ReservationRow reservation={r} onCancel={() => setCancelling(r)} />
+                  <ReservationRow reservation={r} ownerId={user!.id} onCancel={() => setCancelling(r)} />
                 </StaggerItem>
               ))}
             </Stagger>
@@ -153,10 +159,13 @@ export function MyReservationsPage() {
 /** One reservation as a card. `details` adds extra lines (the admin listing shows who booked it). */
 export function ReservationRow({
   reservation: r,
+  ownerId,
   onCancel,
   details,
 }: {
   reservation: Reservation
+  /** Who booked it: when someone else (an admin) cancelled it, the row says who. */
+  ownerId: string
   onCancel: () => void
   details?: ReactNode
 }) {
@@ -171,7 +180,7 @@ export function ReservationRow({
   return (
     <Card className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="flex shrink-0 items-baseline gap-2 sm:w-40 sm:flex-col sm:gap-0">
-        <p className="font-semibold capitalize">{formatDate(r.startsAt, tz)}</p>
+        <p className="font-semibold first-letter:uppercase">{formatDate(r.startsAt, tz)}</p>
         <p className="text-sm text-muted-fg tabular-nums">
           {formatTime(r.startsAt, tz)}–{formatTime(r.endsAt, tz)}
           {zone && <span className="block text-xs">({zone})</span>}
@@ -185,7 +194,11 @@ export function ReservationRow({
         {details}
       </div>
       <div className="flex items-center gap-2">
-        {cancelled && <Badge>Cancelada</Badge>}
+        {cancelled && (
+          <Badge>
+            {r.cancelledBy && r.cancelledBy.id !== ownerId ? `Cancelada por ${r.cancelledBy.name}` : 'Cancelada'}
+          </Badge>
+        )}
         {ongoing && <Badge tone="info">En curso</Badge>}
         {r.seriesId && <Badge tone="primary">Semanal</Badge>}
         {!r.room.isActive && <Badge tone="warning">Sala desactivada</Badge>}

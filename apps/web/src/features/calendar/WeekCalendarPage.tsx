@@ -2,12 +2,11 @@ import { CalendarX2, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
-  Alert,
   Button,
   Card,
-  ConfirmDialog,
   DatePicker,
   EmptyState,
+  ErrorState,
   PageHeader,
   PageLoader,
   Select,
@@ -15,11 +14,11 @@ import {
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { notify } from '../../lib/notify'
-import { formatDate, formatPlainDate, formatTime, isInPast, nowIn, todayISO } from '../../lib/time'
+import { formatPlainDate, formatTime, isInPast, isISODate, nowIn, todayISO, zoneCity } from '../../lib/time'
 import type { ReservationSlot } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
 import { useNow } from '../../lib/useNow'
+import { CancelReservationDialog } from '../reservations/CancelReservationDialog'
 import { ReservationDialog } from '../reservations/ReservationDialog'
 import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 
@@ -31,7 +30,9 @@ export function WeekCalendarPage() {
   const now = useNow()
   const [params, setParams] = useSearchParams()
   const today = todayISO()
-  const date = params.get('fecha') ?? today
+  // A hand-edited or mistyped ?fecha= falls back to today instead of breaking the page.
+  const rawDate = params.get('fecha')
+  const date = isISODate(rawDate) ? rawDate : today
   const monday = mondayOf(date)
 
   // Admins can also browse inactive rooms (their past reservations stay visible).
@@ -75,11 +76,11 @@ export function WeekCalendarPage() {
     <>
       <PageHeader
         title="Calendario semanal"
-        description={room ? `${room.name} · semana del ${weekLabel} · horario de la sala (${tz})` : undefined}
+        description={room ? `${room.name} · semana del ${weekLabel} · hora local de ${zoneCity(tz)}` : undefined}
       />
 
       {rooms.error ? (
-        <Alert>{rooms.error.message}</Alert>
+        <ErrorState message={rooms.error.message} onRetry={rooms.reload} />
       ) : roomList.length === 0 ? (
         <EmptyState icon={CalendarX2} title="No hay salas">
           Un administrador debe crear salas.
@@ -127,12 +128,7 @@ export function WeekCalendarPage() {
           </div>
 
           {week.error ? (
-            <Alert>
-              {week.error.message}{' '}
-              <button type="button" onClick={week.reload} className="font-semibold underline">
-                Reintentar
-              </button>
-            </Alert>
+            <ErrorState message={week.error.message} onRetry={week.reload} />
           ) : !data ? (
             <PageLoader />
           ) : (
@@ -154,7 +150,9 @@ export function WeekCalendarPage() {
                         d.date === roomNow.date && 'bg-primary-soft font-semibold text-primary',
                       )}
                     >
-                      <span className="capitalize">{formatPlainDate(d.date, { month: undefined })}</span>
+                      <span className="inline-block first-letter:uppercase">
+                        {formatPlainDate(d.date, { month: undefined })}
+                      </span>
                     </div>
                   ))}
 
@@ -281,26 +279,18 @@ export function WeekCalendarPage() {
           setBooking(null)
           week.reload()
         }}
+        onConflict={week.reload}
       />
 
-      <ConfirmDialog
-        open={cancelling !== null}
-        title="Cancelar reserva"
-        confirmLabel="Cancelar reserva"
+      <CancelReservationDialog
+        reservation={
+          cancelling && room
+            ? { ...cancelling, room, ownerName: cancelling.userId === user?.id ? undefined : cancelling.userName }
+            : null
+        }
         onClose={() => setCancelling(null)}
-        onConfirm={async () => {
-          await api.cancelReservation(cancelling!.id)
-          notify.success('Reserva cancelada.')
-          week.reload()
-        }}
-      >
-        {cancelling && room && (
-          <p>
-            «{cancelling.title}» en {room.name}, {formatDate(cancelling.startsAt, tz)} de{' '}
-            {formatTime(cancelling.startsAt, tz)} a {formatTime(cancelling.endsAt, tz)}. El horario quedará libre.
-          </p>
-        )}
-      </ConfirmDialog>
+        onDone={week.reload}
+      />
     </>
   )
 }

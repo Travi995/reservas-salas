@@ -1,11 +1,11 @@
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
-import { Button, InputField } from '../../components/ui'
+import { useState } from 'react'
+import { Alert, Button, InputField } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { applyApiError, rules } from '../../lib/forms'
 import { notify } from '../../lib/notify'
 import { AuthLayout } from './AuthLayout'
-import { SocialButtons } from './SocialButtons'
 
 const MIN_PASSWORD = 8
 
@@ -25,18 +25,21 @@ export function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({ mode: 'onTouched', defaultValues: { name: '', email: '', password: '' } })
 
+  const [formError, setFormError] = useState<string | null>(null)
+
   const onSubmit = handleSubmit(async ({ name, email, password }) => {
+    setFormError(null)
     try {
       await signUp(name.trim(), email.trim(), password)
-      notify.success(`¡Bienvenido, ${name.trim()}!`)
+      notify.success(`¡Hola, ${name.trim()}! Tu cuenta está lista.`)
       navigate('/', { replace: true })
     } catch (err) {
-      applyApiError(err, setError, ['name', 'email', 'password'])
+      applyApiError(err, setError, ['name', 'email', 'password'], setFormError)
     }
   })
 
   return (
-    <AuthLayout title="Crea tu cuenta" subtitle="Las cuentas nuevas tienen rol de miembro.">
+    <AuthLayout title="Crea tu cuenta" subtitle="Con tu cuenta podrás ver las salas y reservarlas.">
       <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
         <InputField
           label="Nombre"
@@ -65,13 +68,11 @@ export function RegisterPage() {
             minLength: { value: MIN_PASSWORD, message: `Mínimo ${MIN_PASSWORD} caracteres.` },
           })}
         />
+        {formError && <Alert>{formError}</Alert>}
         <Button type="submit" loading={isSubmitting} className="mt-1 w-full">
           Crear cuenta
         </Button>
       </form>
-      <div className="mt-4">
-        <SocialButtons action="register" />
-      </div>
       <p className="mt-5 text-center text-sm text-muted-fg">
         ¿Ya tienes cuenta?{' '}
         <Link to="/login" className="font-semibold text-primary hover:underline">

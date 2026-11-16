@@ -1,6 +1,6 @@
-import { MapPin, Users, X } from 'lucide-react'
+import { Clock, MapPin, Users, X } from 'lucide-react'
 import { Badge, Button, Card } from '../../components/ui'
-import { formatTime } from '../../lib/time'
+import { formatTime, zoneLabel } from '../../lib/time'
 import { useNow } from '../../lib/useNow'
 import type { ReservationSlot, Room, User } from '../../lib/types'
 import { DayTimeline } from './DayTimeline'
@@ -15,6 +15,8 @@ interface RoomDayCardProps {
 
 export function RoomDayCard({ room, slots, user, onReserve, onCancel }: RoomDayCardProps) {
   const now = useNow()
+  // Times are shown in the room's zone; say so when it is not the viewer's.
+  const zone = zoneLabel(room.timezone)
   const sorted = [...slots].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const canCancel = (s: ReservationSlot) =>
     (user.role === 'admin' || s.userId === user.id) && new Date(s.startsAt) > now
@@ -32,6 +34,12 @@ export function RoomDayCard({ room, slots, user, onReserve, onCancel }: RoomDayC
               <MapPin aria-hidden="true" className="size-4 shrink-0" />{' '}
               <span className="truncate">{room.location}</span>
             </span>
+            {zone && (
+              <span className="inline-flex items-center gap-1">
+                <Clock aria-hidden="true" className="size-4" />{' '}
+                <span className="inline-block first-letter:uppercase">{zone}</span>
+              </span>
+            )}
           </p>
         </div>
         <Button size="sm" onClick={onReserve} aria-label={`Reservar ${room.name}`}>

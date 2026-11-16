@@ -1,4 +1,13 @@
-import { formatPlainDate, validateSlot, weeklyDates, zoneLabel } from './time'
+import {
+  formatDate,
+  formatPlainDate,
+  fromMinutes,
+  isISODate,
+  validateSlot,
+  weeklyDates,
+  zoneCity,
+  zoneLabel,
+} from './time'
 
 const TZ = 'America/Argentina/Buenos_Aires' // UTC-3, no daylight saving time
 // "Now" = 2026-11-20 09:30 in Buenos Aires.
@@ -56,5 +65,41 @@ describe('zoneLabel', () => {
   it('names the room zone only when it differs from the viewer', () => {
     expect(zoneLabel('America/Argentina/Buenos_Aires', 'Europe/Madrid')).toBe('hora de Buenos Aires')
     expect(zoneLabel('Europe/Madrid', 'Europe/Madrid')).toBeNull()
+  })
+})
+
+describe('isISODate (dates coming from the URL)', () => {
+  it('accepts a real date', () => {
+    expect(isISODate('2026-11-20')).toBe(true)
+  })
+
+  it('rejects garbage, other formats, impossible dates and missing values', () => {
+    for (const value of ['basura', '', '18/11/2026', '2026-02-30', null, undefined]) {
+      expect(isISODate(value)).toBe(false)
+    }
+  })
+})
+
+describe('formatDate', () => {
+  it('omits the current year and shows any other', () => {
+    expect(formatDate('2026-11-21T15:00:00Z', TZ, NOW)).not.toMatch(/2026/)
+    expect(formatDate('2027-01-01T15:00:00Z', TZ, NOW)).toMatch(/2027/)
+  })
+
+  it('uses the year of the room zone, not UTC', () => {
+    // 2027-01-01 01:00 UTC is still 31 Dec 2026 in Buenos Aires.
+    expect(formatDate('2027-01-01T01:00:00Z', TZ, NOW)).not.toMatch(/2027/)
+  })
+})
+
+describe('zoneCity and fromMinutes', () => {
+  it('turns an IANA id into a readable city', () => {
+    expect(zoneCity('America/Argentina/Buenos_Aires')).toBe('Buenos Aires')
+    expect(zoneCity('UTC')).toBe('UTC')
+  })
+
+  it('formats minutes since midnight as HH:mm', () => {
+    expect(fromMinutes(9 * 60 + 5)).toBe('09:05')
+    expect(fromMinutes(23 * 60 + 45)).toBe('23:45')
   })
 })

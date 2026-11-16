@@ -71,9 +71,34 @@ export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().tim
  * time is never mistaken for the viewer's own; `null` when they match.
  */
 export function zoneLabel(timeZone: string, viewerZone = browserTimeZone()): string | null {
-  if (timeZone === viewerZone) return null
-  const city = timeZone.split('/').pop()!.replace(/_/g, ' ')
-  return `hora de ${city}`
+  // Compare canonical ids: browsers report "America/Buenos_Aires" for "America/Argentina/Buenos_Aires".
+  if (canonicalZone(timeZone) === canonicalZone(viewerZone)) return null
+  return `hora de ${zoneCity(timeZone)}`
+}
+
+function canonicalZone(timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en', { timeZone }).resolvedOptions().timeZone
+  } catch {
+    return timeZone
+  }
+}
+
+/** "America/Argentina/Buenos_Aires" → "Buenos Aires": the readable part of an IANA id. */
+export function zoneCity(timeZone: string): string {
+  return timeZone.split('/').pop()!.replace(/_/g, ' ')
+}
+
+/** A real calendar date written as "YYYY-MM-DD" (rejects "basura", "18/11/2026", "2026-02-30"). */
+export function isISODate(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value)
+}
+
+/** Minutes since midnight → "HH:mm". */
+export function fromMinutes(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
 export function formatTime(iso: string, timeZone: string): string {
@@ -82,10 +107,17 @@ export function formatTime(iso: string, timeZone: string): string {
   )
 }
 
-export function formatDate(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('es', { timeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(
-    new Date(iso),
-  )
+/** "mar, 17 nov"; the year is added when it is not the current one («jue, 1 ene 2027»). */
+export function formatDate(iso: string, timeZone: string, now = new Date()): string {
+  const date = new Date(iso)
+  const yearOf = (d: Date) => new Intl.DateTimeFormat('en', { timeZone, year: 'numeric' }).format(d)
+  return new Intl.DateTimeFormat('es', {
+    timeZone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(yearOf(date) !== yearOf(now) ? { year: 'numeric' } : {}),
+  }).format(date)
 }
 
 /** Minutes since midnight of an instant, in the room's time zone. */

@@ -15,6 +15,8 @@ export interface Room {
   location: string
   timezone: string
   isActive: boolean
+  /** Changes on every update; sent back when saving so a concurrent edit is detected (409). */
+  version: number
 }
 
 export interface ReservationSlot {
@@ -34,6 +36,8 @@ export interface Reservation {
   status: 'active' | 'cancelled'
   /** Shared by the occurrences of a weekly series; null for one-off reservations. */
   seriesId: string | null
+  /** Who cancelled it (the owner or an admin); null while active or when unknown. */
+  cancelledBy: { id: string; name: string } | null
   room: Room
 }
 
@@ -79,6 +83,11 @@ export interface PageMeta {
 export interface Paginated<T> {
   items: T[]
   meta: PageMeta
+}
+
+/** A page of «my reservations»: `activeItems` = how many in this tab are not cancelled. */
+export interface MyReservationsPage extends Paginated<Reservation> {
+  meta: PageMeta & { activeItems: number }
 }
 
 export interface PageParams {

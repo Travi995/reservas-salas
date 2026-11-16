@@ -27,4 +27,12 @@ describe('applyApiError', () => {
     expect(setError).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('La sala ya está reservada.', { id: 'La sala ya está reservada.' })
   })
+
+  it('hands the message to the form (inline alert) instead of a toast when the form provides a place', () => {
+    const setError = vi.fn()
+    const onFormError = vi.fn()
+    applyApiError(new ApiError(409, 'ROOM_OVERLAP', 'La sala ya está reservada.'), setError, ['title'], onFormError)
+    expect(onFormError).toHaveBeenCalledWith('La sala ya está reservada.')
+    expect(toast.error).not.toHaveBeenCalled()
+  })
 })

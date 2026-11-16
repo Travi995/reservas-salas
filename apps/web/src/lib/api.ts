@@ -3,6 +3,7 @@ import type {
   AdminReservationsQuery,
   AuthResponse,
   Availability,
+  MyReservationsPage,
   PageParams,
   Paginated,
   RecurringReservationInput,
@@ -20,6 +21,8 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
 if (!BASE_URL) throw new Error('VITE_API_URL is not set: copy apps/web/.env.example to apps/web/.env')
 const TOKEN_KEY = 'reservas.token'
+/** A request that hangs must end in an error the user can retry, not in an endless spinner. */
+const TIMEOUT_MS = 20_000
 
 export interface FieldError {
   field: string
@@ -80,8 +83,11 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { ...init, headers })
-  } catch {
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') {
+      throw new ApiError(0, 'TIMEOUT', 'El servidor tarda demasiado en responder. Inténtalo de nuevo.')
+    }
     throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con el servidor. Revisa tu conexión.')
   }
 
@@ -96,6 +102,9 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 }
 
 const json = (body: unknown) => JSON.stringify(body)
+
+/** Spanish alphabetical order («Ñandú» after «Nube», accents ignored), whatever the database collation is. */
+const byName = (a: Room, b: Room) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
 
 /** Builds a query string skipping empty values: `{ page: 2, search: '' }` → `?page=2`. */
 export function toQuery(params: object): string {
@@ -114,15 +123,20 @@ export const api = {
     request<AuthResponse>('/auth/register', { method: 'POST', body: json({ name, email, password }) }),
   me: () => request<User>('/auth/me'),
 
-  rooms: (includeInactive = false) => request<Room[]>(`/rooms${includeInactive ? '?includeInactive=true' : ''}`),
+  rooms: (includeInactive = false) =>
+    request<Room[]>(`/rooms${includeInactive ? '?includeInactive=true' : ''}`).then((rooms) => rooms.sort(byName)),
   createRoom: (input: RoomInput) => request<Room>('/rooms', { method: 'POST', body: json(input) }),
-  updateRoom: (id: string, input: Partial<RoomInput & { isActive: boolean }>) =>
+  /** `version` = the one read with the room: the API answers 409 ROOM_MODIFIED if someone else changed it since. */
+  updateRoom: (id: string, input: Partial<RoomInput & { isActive: boolean }> & { version: number }) =>
     request<Room>(`/rooms/${id}`, { method: 'PATCH', body: json(input) }),
 
   availability: (date: string, minCapacity?: number) => {
     const q = new URLSearchParams({ date })
     if (minCapacity) q.set('minCapacity', String(minCapacity))
-    return request<Availability>(`/availability?${q}`)
+    return request<Availability>(`/availability?${q}`).then((res) => ({
+      ...res,
+      rooms: res.rooms.sort((a, b) => byName(a.room, b.room)),
+    }))
   },
 
   week: (roomId: string, date: string) => request<WeekAvailability>(`/availability/week${toQuery({ roomId, date })}`),
@@ -132,7 +146,7 @@ export const api = {
   createRecurringReservation: (input: RecurringReservationInput) =>
     request<RecurringReservationResult>('/reservations/recurring', { method: 'POST', body: json(input) }),
   myReservations: (scope: ReservationScope, page: PageParams = {}) =>
-    request<Paginated<Reservation>>(`/reservations/me${toQuery({ scope, ...page })}`),
+    request<MyReservationsPage>(`/reservations/me${toQuery({ scope, ...page })}`),
   adminReservations: (query: AdminReservationsQuery = {}) =>
     request<Paginated<AdminReservation>>(`/reservations${toQuery(query)}`),
   cancelReservation: (id: string) => request<Reservation>(`/reservations/${id}/cancel`, { method: 'POST' }),

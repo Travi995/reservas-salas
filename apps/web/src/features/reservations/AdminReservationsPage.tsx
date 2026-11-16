@@ -162,6 +162,7 @@ export function AdminReservationsPage() {
               <StaggerItem as="li" key={r.id}>
                 <ReservationRow
                   reservation={r}
+                  ownerId={r.user.id}
                   onCancel={() => setCancelling(r)}
                   details={
                     <p className="mt-1 flex min-w-0 items-center gap-1 text-sm text-muted-fg">
@@ -180,7 +181,7 @@ export function AdminReservationsPage() {
       )}
 
       <CancelReservationDialog
-        reservation={cancelling}
+        reservation={cancelling && { ...cancelling, ownerName: cancelling.user.name }}
         onClose={() => setCancelling(null)}
         onDone={() => {
           // With «Activas» the cancelled one leaves the list: if it was alone on this page, go back one.
