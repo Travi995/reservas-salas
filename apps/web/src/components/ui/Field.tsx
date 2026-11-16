@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useId, type InputHTMLAttributes, type ReactNode } from 'react'
 import { cn } from './cn'
 
 const CONTROL =
@@ -49,30 +49,6 @@ export function InputField({ label, error, hint, className, ...props }: InputFie
           className={cn(CONTROL, invalid ? 'border-danger' : 'border-border')}
           {...props}
         />
-      )}
-    </FieldShell>
-  )
-}
-
-interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  label: string
-  error?: string
-  hint?: string
-}
-
-export function SelectField({ label, error, hint, className, children, ...props }: SelectFieldProps) {
-  return (
-    <FieldShell label={label} error={error} hint={hint} className={className}>
-      {({ id, describedBy, invalid }) => (
-        <select
-          id={id}
-          aria-describedby={describedBy}
-          aria-invalid={invalid || undefined}
-          className={cn(CONTROL, invalid ? 'border-danger' : 'border-border')}
-          {...props}
-        >
-          {children}
-        </select>
       )}
     </FieldShell>
   )
