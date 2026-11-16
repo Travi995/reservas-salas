@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  VersionColumn,
 } from 'typeorm';
 
 export const DEFAULT_TIME_ZONE = 'America/Argentina/Buenos_Aires';
@@ -12,7 +13,8 @@ export class Room {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 80 })
+  /** Unique: two rooms with the same name cannot be told apart when booking. */
+  @Column({ length: 80, unique: true })
   name: string;
 
   @Column({ type: 'int' })
@@ -28,6 +30,10 @@ export class Room {
   /** Inactive rooms reject new reservations; existing ones (past and future) are kept. */
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
+
+  /** Incremented by TypeORM on every update; clients send it back to detect concurrent edits. */
+  @VersionColumn()
+  version: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', select: false })
   createdAt: Date;

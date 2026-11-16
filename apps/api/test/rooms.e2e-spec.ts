@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Role } from '../src/modules/users/enums/role.enum.js';
 import {
   createTestApp,
+  dateIn,
   loginAs,
   resetDb,
   type TestContext,
@@ -38,6 +39,7 @@ describe('Rooms (e2e)', () => {
         ...ROOM,
         timezone: 'America/Argentina/Buenos_Aires',
         isActive: true,
+        version: 1,
       });
     });
 
@@ -61,6 +63,35 @@ describe('Rooms (e2e)', () => {
       ).toEqual(['capacity', 'location', 'name', 'timezone']);
     });
 
+    it('400: rejects time zone offsets and misspelled ids', async () => {
+      for (const timezone of ['+05:00', 'europe/madrid']) {
+        const res = await createRoom({ ...ROOM, timezone }).expect(400);
+        expect(res.body.error.details[0].field).toBe('timezone');
+      }
+    });
+
+    it('400: an explicit null is a validation error, not a 500', async () => {
+      const res = await createRoom({ ...ROOM, timezone: null }).expect(400);
+      expect(res.body.error.details[0].field).toBe('timezone');
+    });
+
+    it('409: the room name is unique', async () => {
+      await createRoom().expect(201);
+      const res = await createRoom({ ...ROOM, capacity: 4 }).expect(409);
+      expect(res.body.error).toMatchObject({
+        code: 'ROOM_NAME_TAKEN',
+        details: [{ field: 'name', message: expect.any(String) }],
+      });
+    });
+
+    it('concurrency: the same room created 8 times at once exists only once', async () => {
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () => createRoom()),
+      );
+      const statuses = results.map((r) => r.status).sort((a, b) => a - b);
+      expect(statuses).toEqual([201, ...Array(7).fill(409)]);
+    });
+
     it('403: members cannot create rooms', async () => {
       const res = await http()
         .post('/api/v1/rooms')
@@ -76,6 +107,114 @@ describe('Rooms (e2e)', () => {
   });
 
   describe('PATCH /api/rooms/:id', () => {
+    const patch = (id: string, body: object) =>
+      http().patch(`/api/v1/rooms/${id}`).set(asAdmin()).send(body);
+
+    it('400: an explicit null in any field is a validation error, not a 500', async () => {
+      const { body: room } = await createRoom();
+      for (const field of [
+        'name',
+        'capacity',
+        'location',
+        'timezone',
+        'isActive',
+        'version',
+      ]) {
+        const res = await patch(room.id, { [field]: null }).expect(400);
+        expect(res.body.error.details[0].field).toBe(field);
+      }
+    });
+
+    it('409: renaming to the name of another room', async () => {
+      await createRoom();
+      const { body: other } = await createRoom({ ...ROOM, name: 'Sala Pampa' });
+      const res = await patch(other.id, { name: ROOM.name }).expect(409);
+      expect(res.body.error.code).toBe('ROOM_NAME_TAKEN');
+    });
+
+    describe('optimistic locking (two admins editing the same room)', () => {
+      it('every update increments the version', async () => {
+        const { body: room } = await createRoom();
+        const res = await patch(room.id, { capacity: 10, version: 1 });
+        expect(res.body.version).toBe(2);
+      });
+
+      it('409 ROOM_MODIFIED: a save based on a stale version does not overwrite the newer change', async () => {
+        const { body: room } = await createRoom();
+        // Both admins opened the form at version 1; the first one saves.
+        await patch(room.id, { capacity: 99, version: room.version }).expect(
+          200,
+        );
+        const res = await patch(room.id, {
+          name: 'Renombrada',
+          capacity: room.capacity,
+          version: room.version,
+        }).expect(409);
+        expect(res.body.error.code).toBe('ROOM_MODIFIED');
+
+        const list = await http().get('/api/v1/rooms').set(asAdmin());
+        expect(list.body[0]).toMatchObject({ name: ROOM.name, capacity: 99 });
+      });
+
+      it('concurrency: two simultaneous saves with the same version → one 200, one 409', async () => {
+        const { body: room } = await createRoom();
+        const results = await Promise.all([
+          patch(room.id, { capacity: 10, version: room.version }),
+          patch(room.id, { capacity: 20, version: room.version }),
+        ]);
+        expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([
+          200, 409,
+        ]);
+      });
+
+      it('without a version the update is applied (last write wins)', async () => {
+        const { body: room } = await createRoom();
+        await patch(room.id, { capacity: 10 }).expect(200);
+        await patch(room.id, { capacity: 20 }).expect(200);
+      });
+    });
+
+    describe('time zone change', () => {
+      const book = (roomId: string) =>
+        http()
+          .post('/api/v1/reservations')
+          .set(asMember())
+          .send({
+            roomId,
+            date: dateIn(2),
+            startTime: '10:00',
+            endTime: '11:00',
+            title: 'Daily',
+          });
+
+      it('422 ROOM_HAS_RESERVATIONS: would move the local time of pending reservations', async () => {
+        const { body: room } = await createRoom();
+        await book(room.id).expect(201);
+        const res = await patch(room.id, { timezone: 'Europe/Madrid' }).expect(
+          422,
+        );
+        expect(res.body.error.code).toBe('ROOM_HAS_RESERVATIONS');
+        // Sending the same zone again (the form always sends it) is not a change.
+        await patch(room.id, {
+          timezone: room.timezone,
+          capacity: 10,
+        }).expect(200);
+      });
+
+      it('200: allowed once the pending reservations are cancelled', async () => {
+        const { body: room } = await createRoom();
+        const { body: reservation } = await book(room.id);
+        await http()
+          .post(`/api/v1/reservations/${reservation.id}/cancel`)
+          .set(asAdmin())
+          .expect(200);
+        const res = await patch(room.id, { timezone: 'Europe/Madrid' }).expect(
+          200,
+        );
+        expect(res.body.timezone).toBe('Europe/Madrid');
+      });
+    });
+
     it('200: admin edits and deactivates a room', async () => {
       const { body: room } = await createRoom();
       const res = await http()

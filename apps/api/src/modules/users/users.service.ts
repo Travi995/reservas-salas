@@ -1,11 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+import { isPgError, PG } from '../../common/database/pg-errors.js';
 import { AppException } from '../../common/exceptions/app.exception.js';
 import { User } from './entities/user.entity.js';
 import { Role } from './enums/role.enum.js';
-
-const UNIQUE_VIOLATION = '23505';
 
 export interface CreateUserData {
   name: string;
@@ -49,10 +48,7 @@ export class UsersService {
       return rest as User;
     } catch (e) {
       // The unique index is the real guarantee (two concurrent registrations with the same email).
-      if (
-        e instanceof QueryFailedError &&
-        (e.driverError as { code?: string }).code === UNIQUE_VIOLATION
-      ) {
+      if (isPgError(e, PG.UNIQUE_VIOLATION)) {
         throw new AppException(
           HttpStatus.CONFLICT,
           'EMAIL_TAKEN',
