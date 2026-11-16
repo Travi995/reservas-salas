@@ -6,13 +6,18 @@ import { MAX_CAPACITY } from '../../rooms/dtos/create-room.dto.js';
 
 export class AvailabilityQueryDto {
   /** Calendar day, interpreted in each room's own time zone. */
-  @ApiProperty({ example: '2026-11-20' })
+  @ApiProperty({
+    example: '2026-11-20',
+    description:
+      'Día a consultar (AAAA-MM-DD), en la zona horaria de cada sala',
+  })
   @IsDateOnly({ message: 'Indica una fecha válida (AAAA-MM-DD).' })
   date: string;
 
   @ApiPropertyOptional({
     example: 8,
-    description: 'Only rooms for at least this many people',
+    description:
+      'Solo salas con capacidad para al menos esta cantidad de personas',
   })
   @IsOptional()
   @Type(() => Number)

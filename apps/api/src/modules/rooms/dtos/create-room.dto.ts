@@ -16,14 +16,23 @@ import { DEFAULT_TIME_ZONE } from '../entities/room.entity.js';
 export const MAX_CAPACITY = 500;
 
 export class CreateRoomDto {
-  @ApiProperty({ example: 'Sala Andes', maxLength: 80 })
+  @ApiProperty({
+    example: 'Sala Andes',
+    maxLength: 80,
+    description: 'Nombre único',
+  })
   @Transform(trim)
   @IsString({ message: 'El nombre debe ser texto.' })
   @IsNotEmpty({ message: 'Indica el nombre de la sala.' })
   @MaxLength(80, { message: 'El nombre admite como máximo 80 caracteres.' })
   name: string;
 
-  @ApiProperty({ example: 8, minimum: 1, maximum: MAX_CAPACITY })
+  @ApiProperty({
+    example: 8,
+    minimum: 1,
+    maximum: MAX_CAPACITY,
+    description: 'Personas que caben',
+  })
   @IsInt({ message: 'La capacidad debe ser un número entero.' })
   @Min(1, { message: 'La capacidad debe ser al menos 1.' })
   @Max(MAX_CAPACITY, {
@@ -42,7 +51,8 @@ export class CreateRoomDto {
 
   @ApiPropertyOptional({
     example: DEFAULT_TIME_ZONE,
-    description: 'IANA time zone',
+    description:
+      'Zona horaria IANA de la oficina, escrita tal cual (p. ej. `Europe/Madrid`). Por defecto, Buenos Aires.',
   })
   @IsUndefinable()
   @IsTimeZone({ message: 'La zona horaria no es válida.' })

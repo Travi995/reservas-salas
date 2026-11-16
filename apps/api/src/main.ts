@@ -1,10 +1,10 @@
 import { ConsoleLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';
 import type { Env } from './config/env.validation.js';
+import { setupSwagger } from './config/swagger.js';
 
 async function bootstrap() {
   // Buffer startup logs until the logger chosen by LOG_FORMAT is in place.
@@ -22,15 +22,7 @@ async function bootstrap() {
 
   // API docs are a development aid: not exposed in production.
   if (config.get('NODE_ENV', { infer: true }) !== 'production') {
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('Reservas de salas')
-      .setDescription('API para reservar salas de reunión sin solapamientos')
-      .setVersion('0.1.0')
-      .addBearerAuth()
-      .build();
-    SwaggerModule.setup('docs', app, () =>
-      SwaggerModule.createDocument(app, swaggerConfig),
-    );
+    setupSwagger(app);
   }
 
   await app.listen(config.get('PORT', { infer: true }));

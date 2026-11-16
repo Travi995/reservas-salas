@@ -10,7 +10,11 @@ import { CreateRoomDto } from './create-room.dto.js';
 export class UpdateRoomDto extends PartialType(CreateRoomDto, {
   skipNullProperties: false,
 }) {
-  @ApiPropertyOptional({ example: false })
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      '`false` desactiva la sala (no acepta reservas nuevas); `true` la reactiva',
+  })
   @IsUndefinable()
   @IsBoolean({ message: 'isActive debe ser true o false.' })
   isActive?: boolean;
@@ -21,7 +25,8 @@ export class UpdateRoomDto extends PartialType(CreateRoomDto, {
    */
   @ApiPropertyOptional({
     example: 3,
-    description: 'Version read by the client; 409 if the room changed since',
+    description:
+      '`version` que leyó el cliente; si la sala cambió desde entonces, `409 ROOM_MODIFIED`',
   })
   @IsUndefinable()
   @IsInt({ message: 'version debe ser un número entero.' })
