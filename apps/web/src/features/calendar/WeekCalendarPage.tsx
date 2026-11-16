@@ -21,7 +21,7 @@ import { useAsync } from '../../lib/useAsync'
 import { useNow } from '../../lib/useNow'
 import { CancelReservationDialog } from '../reservations/CancelReservationDialog'
 import { ReservationDialog } from '../reservations/ReservationDialog'
-import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
+import { hhmm, layoutColumns, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 
 /**
  * Pixels per minute. The grid adapts to the height available (so the page needs no scroll), within these bounds.
@@ -32,6 +32,8 @@ const PX_MIN = 0.75
 const PX_MAX = 1
 /** Cards at least this tall (px) show the title and the time on separate lines; shorter ones fit both on one. */
 const CARD_TWO_LINES_PX = 38
+/** A card is never drawn shorter than this (px): a 15-minute meeting would otherwise be too small to read. */
+const MIN_CARD_PX = 20
 /** Height of the sticky row with the day names, which is not part of the hours area. */
 const HEADER_PX = 40
 
@@ -258,50 +260,72 @@ export function WeekCalendarPage() {
                         />
                       )}
 
-                      {d.reservations.map((s) => {
-                        const box = slotBox(s, tz, from)
-                        const mine = s.userId === user?.id
-                        const time = `${formatTime(s.startsAt, tz)}–${formatTime(s.endsAt, tz)}`
-                        const cancellable = canCancel(s)
-                        const owner = mine ? 'Tú' : s.userName
-                        // The pixel height of the card decides its layout: two lines need ~38 px, otherwise one (short meetings).
-                        const height = Math.max(box.height * PX - 2, 16)
-                        const twoLines = height >= CARD_TWO_LINES_PX
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            disabled={!cancellable}
-                            onClick={() => setCancelling(s)}
-                            title={`${s.title} · ${time} · ${mine ? 'Tú' : s.userName}`}
-                            aria-label={`${s.title}, ${time}, ${mine ? 'tu reserva' : `de ${s.userName}`}${
-                              cancellable ? '. Pulsa para cancelar' : ''
-                            }`}
-                            className={cn(
-                              'absolute inset-x-1 z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-xs leading-4',
-                              mine ? 'border-primary bg-primary-soft text-fg' : 'border-danger bg-danger-soft text-fg',
-                              cancellable ? 'cursor-pointer hover:brightness-95' : 'cursor-default',
-                            )}
-                            style={{ top: box.top * PX + 1, height }}
-                          >
-                            {twoLines ? (
-                              <>
-                                <span className="block truncate font-semibold">{s.title}</span>
-                                {/* The time never truncates; the name gives way when the column is narrow. */}
-                                <span className="flex gap-1 tabular-nums">
-                                  <span className="shrink-0 font-medium">{time}</span>
-                                  <span className="truncate opacity-75">· {owner}</span>
+                      {(() => {
+                        // Cards drawn taller than their duration can touch: those share the day's width side by side.
+                        const boxes = d.reservations.map((s) => {
+                          const b = slotBox(s, tz, from)
+                          return { top: b.top * PX + 1, height: Math.max(b.height * PX - 2, MIN_CARD_PX) }
+                        })
+                        const placements = layoutColumns(boxes)
+                        return d.reservations.map((s, index) => {
+                          const mine = s.userId === user?.id
+                          const time = `${formatTime(s.startsAt, tz)}–${formatTime(s.endsAt, tz)}`
+                          const cancellable = canCancel(s)
+                          const owner = mine ? 'Tú' : s.userName
+                          // The pixel height of the card decides its layout: two lines need ~38 px, otherwise one (short meetings).
+                          const { top, height } = boxes[index]
+                          const { column, columns } = placements[index]
+                          const twoLines = height >= CARD_TWO_LINES_PX
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              disabled={!cancellable}
+                              onClick={() => setCancelling(s)}
+                              title={`${s.title} · ${time} · ${mine ? 'Tú' : s.userName}`}
+                              aria-label={`${s.title}, ${time}, ${mine ? 'tu reserva' : `de ${s.userName}`}${
+                                cancellable ? '. Pulsa para cancelar' : ''
+                              }`}
+                              className={cn(
+                                'absolute z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-xs leading-4',
+                                mine
+                                  ? 'border-primary bg-primary-soft text-fg'
+                                  : 'border-danger bg-danger-soft text-fg',
+                                cancellable ? 'cursor-pointer hover:brightness-95' : 'cursor-default',
+                              )}
+                              style={{
+                                top,
+                                height,
+                                // The day's width (minus 4 px of margin on each side) is shared by the cards that touch.
+                                left: `calc(0.25rem + (100% - 0.5rem) * ${column} / ${columns})`,
+                                width: `calc((100% - 0.5rem) / ${columns} - ${columns > 1 ? 2 : 0}px)`,
+                              }}
+                            >
+                              {columns > 1 ? (
+                                // Side by side the card is too narrow for a title: the start time stays readable and the
+                                // full title is in the tooltip and the accessible name.
+                                <span className="block truncate font-semibold tabular-nums">
+                                  {formatTime(s.startsAt, tz)}
                                 </span>
-                              </>
-                            ) : (
-                              <span className="flex gap-1 tabular-nums">
-                                <span className="shrink-0 font-semibold">{formatTime(s.startsAt, tz)}</span>
-                                <span className="truncate font-semibold">{s.title}</span>
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
+                              ) : twoLines ? (
+                                <>
+                                  <span className="block truncate font-semibold">{s.title}</span>
+                                  {/* The time never truncates; the name gives way when the column is narrow. */}
+                                  <span className="flex gap-1 tabular-nums">
+                                    <span className="shrink-0 font-medium">{time}</span>
+                                    <span className="truncate opacity-75">· {owner}</span>
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="flex gap-1 tabular-nums">
+                                  <span className="shrink-0 font-semibold">{formatTime(s.startsAt, tz)}</span>
+                                  <span className="truncate font-semibold">{s.title}</span>
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })
+                      })()}
                     </section>
                   ))}
                 </div>

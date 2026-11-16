@@ -1,5 +1,5 @@
 import type { ReservationSlot } from '../../lib/types'
-import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
+import { hhmm, layoutColumns, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 
 const TZ = 'America/Argentina/Buenos_Aires' // UTC-3
 const slot = (startsAt: string, endsAt: string): ReservationSlot => ({
@@ -40,5 +40,63 @@ describe('week helpers', () => {
 
   it('hhmm pads hours and minutes', () => {
     expect(hhmm(545)).toBe('09:05')
+  })
+})
+
+describe('layoutColumns', () => {
+  it('gives a lone card the full width', () => {
+    expect(layoutColumns([{ top: 10, height: 40 }])).toEqual([{ column: 0, columns: 1 }])
+  })
+
+  it('keeps cards that do not touch at full width', () => {
+    expect(
+      layoutColumns([
+        { top: 0, height: 40 },
+        { top: 40, height: 40 },
+      ]),
+    ).toEqual([
+      { column: 0, columns: 1 },
+      { column: 0, columns: 1 },
+    ])
+  })
+
+  it('puts two back-to-back short cards side by side when their drawn heights cross', () => {
+    // 14:00–14:15 and 14:15–14:30 drawn 20 px tall, but only 11 px apart.
+    expect(
+      layoutColumns([
+        { top: 0, height: 20 },
+        { top: 11, height: 20 },
+      ]),
+    ).toEqual([
+      { column: 0, columns: 2 },
+      { column: 1, columns: 2 },
+    ])
+  })
+
+  it('reuses a column once its card has ended, and sizes each group on its own', () => {
+    const placements = layoutColumns([
+      { top: 0, height: 20 },
+      { top: 11, height: 20 },
+      { top: 25, height: 20 }, // clears the first card: goes back to column 0 of the same group
+      { top: 200, height: 20 }, // a separate group, full width
+    ])
+    expect(placements).toEqual([
+      { column: 0, columns: 2 },
+      { column: 1, columns: 2 },
+      { column: 0, columns: 2 },
+      { column: 0, columns: 1 },
+    ])
+  })
+
+  it('returns placements in the order of the input', () => {
+    expect(
+      layoutColumns([
+        { top: 11, height: 20 },
+        { top: 0, height: 20 },
+      ]),
+    ).toEqual([
+      { column: 1, columns: 2 },
+      { column: 0, columns: 2 },
+    ])
   })
 })
