@@ -23,11 +23,15 @@ import { CancelReservationDialog } from '../reservations/CancelReservationDialog
 import { ReservationDialog } from '../reservations/ReservationDialog'
 import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 
-/** Pixels per minute. The grid adapts to the height available (so the page needs no scroll), within these bounds. */
-const PX_MIN = 0.5
+/**
+ * Pixels per minute. The grid adapts to the height available (so the page needs no scroll), within these bounds.
+ * The minimum keeps a one-hour card tall enough (45 px) for its title and time on two lines; below that the
+ * calendar scrolls inside its card instead of squeezing the cards.
+ */
+const PX_MIN = 0.75
 const PX_MAX = 1
 /** Cards at least this tall (px) show the title and the time on separate lines; shorter ones fit both on one. */
-const CARD_TWO_LINES_PX = 34
+const CARD_TWO_LINES_PX = 38
 /** Height of the sticky row with the day names, which is not part of the hours area. */
 const HEADER_PX = 40
 
@@ -260,7 +264,7 @@ export function WeekCalendarPage() {
                         const time = `${formatTime(s.startsAt, tz)}–${formatTime(s.endsAt, tz)}`
                         const cancellable = canCancel(s)
                         const owner = mine ? 'Tú' : s.userName
-                        // The pixel height of the card decides its layout: two lines need ~34 px, otherwise one.
+                        // The pixel height of the card decides its layout: two lines need ~38 px, otherwise one (short meetings).
                         const height = Math.max(box.height * PX - 2, 16)
                         const twoLines = height >= CARD_TWO_LINES_PX
                         return (
@@ -274,7 +278,7 @@ export function WeekCalendarPage() {
                               cancellable ? '. Pulsa para cancelar' : ''
                             }`}
                             className={cn(
-                              'absolute inset-x-1 z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-px text-left text-xs leading-4',
+                              'absolute inset-x-1 z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-xs leading-4',
                               mine ? 'border-primary bg-primary-soft text-fg' : 'border-danger bg-danger-soft text-fg',
                               cancellable ? 'cursor-pointer hover:brightness-95' : 'cursor-default',
                             )}
