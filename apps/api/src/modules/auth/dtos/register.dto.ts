@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { trim } from '../../../common/transforms/trim.transform.js';
 import {
   IsEmail,
   IsNotEmpty,
@@ -7,9 +8,6 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-
-const trim = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.trim() : value;
 
 export class RegisterDto {
   @ApiProperty({ example: 'Ana Pérez', maxLength: 80 })
