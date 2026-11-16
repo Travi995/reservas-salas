@@ -3,12 +3,14 @@
   "private": true,
   "packageManager": "pnpm@12.21.0",
   "scripts": {
-    "db:up": "docker compose --env-file apps/api/.env up -d",
+    "bootstrap": "node scripts/setup.mjs && pnpm install && pnpm db:up && pnpm seed",
+    "dev": "pnpm db:up && pnpm --parallel --filter @reservas/api --filter @reservas/web dev",
+    "db:up": "docker compose --env-file apps/api/.env up -d --wait",
     "db:down": "docker compose --env-file apps/api/.env down",
-    "dev:api": "pnpm --filter @reservas/api start:dev",
-    "dev:web": "pnpm --filter @reservas/web dev",
+    "seed": "pnpm --filter @reservas/api seed",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @reservas/api test:e2e",
     "lint": "pnpm -r lint"
   }
 }
