@@ -6,10 +6,10 @@ import {
   Button,
   ConfirmDialog,
   EmptyState,
-  InputField,
+  DatePicker,
   PageHeader,
   PageLoader,
-  SelectField,
+  Select,
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { notify } from '../../lib/notify'
@@ -21,7 +21,10 @@ import { ReservationDialog } from '../reservations/ReservationDialog'
 import { RoomDayCard } from './RoomDayCard'
 import { Stagger, StaggerItem } from '../../components/motion'
 
-const CAPACITIES = [2, 4, 6, 8, 10, 12, 20]
+const CAPACITY_OPTIONS = [
+  { value: '', label: 'Cualquiera' },
+  ...[2, 4, 6, 8, 10, 12, 20].map((c) => ({ value: String(c), label: `${c} personas o más` })),
+]
 
 function shiftDate(date: string, days: number) {
   const d = new Date(`${date}T12:00:00Z`)
@@ -84,19 +87,13 @@ export function AvailabilityPage() {
             <ChevronRight aria-hidden="true" className="size-5" />
           </Button>
         </div>
-        <InputField label="Fecha" type="date" value={date} onChange={(e) => update('fecha', e.target.value)} />
-        <SelectField
+        <DatePicker label="Fecha" value={date} onChange={(value) => update('fecha', value)} />
+        <Select
           label="Capacidad mínima"
-          value={minCapacity || ''}
-          onChange={(e) => update('capacidad', e.target.value)}
-        >
-          <option value="">Cualquiera</option>
-          {CAPACITIES.map((c) => (
-            <option key={c} value={c}>
-              {c} personas o más
-            </option>
-          ))}
-        </SelectField>
+          value={minCapacity ? String(minCapacity) : ''}
+          onChange={(value) => update('capacidad', value)}
+          options={CAPACITY_OPTIONS}
+        />
       </div>
 
       {loading && !data ? (

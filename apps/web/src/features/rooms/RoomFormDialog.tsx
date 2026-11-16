@@ -1,7 +1,8 @@
-import { useForm } from 'react-hook-form'
-import { Button, Dialog, InputField } from '../../components/ui'
+import { Controller, useForm } from 'react-hook-form'
+import { Button, Dialog, InputField, Select } from '../../components/ui'
 import { api } from '../../lib/api'
 import { applyApiError, rules } from '../../lib/forms'
+import { DEFAULT_TIME_ZONE, TIME_ZONE_OPTIONS } from '../../lib/timezones'
 import type { Room } from '../../lib/types'
 
 interface RoomFormDialogProps {
@@ -23,25 +24,32 @@ interface RoomFormValues {
   name: string
   capacity: number
   location: string
+  timezone: string
 }
 
 function RoomForm({ room, onClose, onSaved }: Omit<RoomFormDialogProps, 'open'>) {
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<RoomFormValues>({
     mode: 'onTouched',
-    defaultValues: { name: room?.name ?? '', capacity: room?.capacity, location: room?.location ?? '' },
+    defaultValues: {
+      name: room?.name ?? '',
+      capacity: room?.capacity,
+      location: room?.location ?? '',
+      timezone: room?.timezone ?? DEFAULT_TIME_ZONE,
+    },
   })
 
-  const onSubmit = handleSubmit(async ({ name, capacity, location }) => {
+  const onSubmit = handleSubmit(async ({ name, capacity, location, timezone }) => {
     try {
-      const input = { name: name.trim(), capacity, location: location.trim() }
+      const input = { name: name.trim(), capacity, location: location.trim(), timezone }
       onSaved(room ? await api.updateRoom(room.id, input) : await api.createRoom(input))
     } catch (err) {
-      applyApiError(err, setError, ['name', 'capacity', 'location'])
+      applyApiError(err, setError, ['name', 'capacity', 'location', 'timezone'])
     }
   })
 
@@ -78,6 +86,20 @@ function RoomForm({ room, onClose, onSaved }: Omit<RoomFormDialogProps, 'open'>)
           validate: rules.notBlank('Indica la ubicación.'),
           maxLength: { value: 120, message: 'Máximo 120 caracteres.' },
         })}
+      />
+      <Controller
+        control={control}
+        name="timezone"
+        rules={{ required: rules.required('Elige la zona horaria.') }}
+        render={({ field, fieldState }) => (
+          <Select
+            label="Zona horaria"
+            hint="Las reservas de esta sala se hacen en su hora local."
+            options={TIME_ZONE_OPTIONS}
+            error={fieldState.error?.message}
+            {...field}
+          />
+        )}
       />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onClose}>

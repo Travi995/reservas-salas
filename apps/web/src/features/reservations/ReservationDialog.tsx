@@ -1,5 +1,5 @@
-import { useForm } from 'react-hook-form'
-import { Button, Dialog, InputField, SelectField } from '../../components/ui'
+import { Controller, useForm } from 'react-hook-form'
+import { Button, DatePicker, Dialog, InputField, Select } from '../../components/ui'
 import { api } from '../../lib/api'
 import { applyApiError, rules } from '../../lib/forms'
 import { notify } from '../../lib/notify'
@@ -34,6 +34,7 @@ const FIELDS = ['roomId', 'date', 'startTime', 'endTime', 'title'] as const
 function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<ReservationDialogProps, 'open'>) {
   const {
     register,
+    control,
     handleSubmit,
     setError,
     getValues,
@@ -57,26 +58,26 @@ function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<Reservatio
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      <SelectField
-        label="Sala"
-        error={errors.roomId?.message}
-        {...register('roomId', { required: rules.required('Elige una sala.') })}
-      >
-        {rooms.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.name} · {r.capacity} personas
-          </option>
-        ))}
-      </SelectField>
-      <InputField
-        label="Fecha"
-        type="date"
-        min={todayISO()}
-        error={errors.date?.message}
-        {...register('date', {
-          required: rules.required('Indica la fecha.'),
-          deps: ['startTime'],
-        })}
+      <Controller
+        control={control}
+        name="roomId"
+        rules={{ required: rules.required('Elige una sala.') }}
+        render={({ field, fieldState }) => (
+          <Select
+            label="Sala"
+            options={rooms.map((r) => ({ value: r.id, label: r.name, description: `${r.capacity} personas` }))}
+            error={fieldState.error?.message}
+            {...field}
+          />
+        )}
+      />
+      <Controller
+        control={control}
+        name="date"
+        rules={{ required: rules.required('Indica la fecha.'), deps: ['startTime'] }}
+        render={({ field, fieldState }) => (
+          <DatePicker label="Fecha" min={todayISO()} error={fieldState.error?.message} {...field} />
+        )}
       />
       <div className="grid grid-cols-2 gap-3">
         <InputField

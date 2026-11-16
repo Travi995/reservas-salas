@@ -54,6 +54,7 @@ export interface RoomInput {
   name: string
   capacity: number
   location: string
+  timezone: string
 }
 
 export interface ReservationInput {
