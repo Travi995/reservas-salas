@@ -3,12 +3,12 @@ import { Transform } from 'class-transformer';
 import {
   IsInt,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsUndefinable } from '../../../common/decorators/is-undefinable.decorator.js';
 import { IsTimeZone } from '../../../common/decorators/is-time-zone.decorator.js';
 import { trim } from '../../../common/transforms/trim.transform.js';
 import { DEFAULT_TIME_ZONE } from '../entities/room.entity.js';
@@ -44,7 +44,7 @@ export class CreateRoomDto {
     example: DEFAULT_TIME_ZONE,
     description: 'IANA time zone',
   })
-  @IsOptional()
+  @IsUndefinable()
   @IsTimeZone({ message: 'La zona horaria no es válida.' })
   timezone?: string;
 }
