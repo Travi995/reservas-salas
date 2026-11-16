@@ -1,32 +1,29 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { databaseOptions } from './database/database.config.js';
+import { UsersModule } from './modules/users/users.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 
 @Module({
   imports: [
-    // El .env vive en la raíz del monorepo (compartido con docker-compose).
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['../../.env', '.env'],
-    }),
+    // apps/api/.env (plantilla en .env.example). También lo usa docker compose.
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: Number(config.get<string>('DB_PORT', '5440')),
-        username: config.get<string>('DB_USER', 'reservas'),
-        password: config.get<string>('DB_PASSWORD', 'reservas'),
-        database: config.get<string>('DB_NAME', 'reservas'),
+        ...databaseOptions({
+          DB_HOST: config.get('DB_HOST'),
+          DB_PORT: config.get('DB_PORT'),
+          DB_USER: config.get('DB_USER'),
+          DB_PASSWORD: config.get('DB_PASSWORD'),
+          DB_NAME: config.get('DB_NAME'),
+        }),
         autoLoadEntities: true,
-        // Esquema solo mediante migraciones explícitas (ADR-0002 / ADR-0003).
-        synchronize: false,
       }),
     }),
+    UsersModule,
+    AuthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
