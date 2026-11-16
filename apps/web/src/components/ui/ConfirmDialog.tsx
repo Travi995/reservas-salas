@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   title: string
   children: ReactNode
   confirmLabel: string
+  /** Label of the safe option; say what is kept ("No, mantenerla") rather than a bare "Volver". */
+  cancelLabel?: string
   tone?: 'primary' | 'danger'
   onConfirm: () => Promise<void>
   onClose: () => void
@@ -19,6 +21,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  cancelLabel = 'Volver',
   tone = 'danger',
   onConfirm,
   onClose,
@@ -44,7 +47,7 @@ export function ConfirmDialog({
       <div className="text-muted-fg">{children}</div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={close}>
-          Volver
+          {cancelLabel}
         </Button>
         <Button variant={tone === 'danger' ? 'danger' : 'primary'} loading={loading} onClick={confirm}>
           {confirmLabel}

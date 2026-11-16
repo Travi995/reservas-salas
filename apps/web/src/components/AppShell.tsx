@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarCheck, DoorOpen, LogOut } from 'lucide-react'
+import { CalendarDays, CalendarCheck, CalendarRange, ClipboardList, DoorOpen, LogOut } from 'lucide-react'
 import { motion } from 'motion/react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../lib/auth'
@@ -9,7 +9,9 @@ import { Logo, cn } from './ui'
 
 const NAV = [
   { to: '/', label: 'Disponibilidad', icon: CalendarDays, admin: false },
+  { to: '/calendario', label: 'Calendario', icon: CalendarRange, admin: false },
   { to: '/mis-reservas', label: 'Mis reservas', icon: CalendarCheck, admin: false },
+  { to: '/admin/reservas', label: 'Reservas', icon: ClipboardList, admin: true },
   { to: '/admin/salas', label: 'Salas', icon: DoorOpen, admin: true },
 ]
 

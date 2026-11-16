@@ -31,5 +31,14 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   }, [run, version])
 
   const reload = useCallback(() => setVersion((v) => v + 1), [])
+
+  // If the last load failed (e.g. offline), retry by itself as soon as the connection is back.
+  const failed = state.error !== null
+  useEffect(() => {
+    if (!failed) return
+    window.addEventListener('online', reload)
+    return () => window.removeEventListener('online', reload)
+  }, [failed, reload])
+
   return { ...state, reload }
 }

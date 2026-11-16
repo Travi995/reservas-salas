@@ -63,6 +63,19 @@ export function todayISO(now = new Date()): string {
   return nowIn(Intl.DateTimeFormat().resolvedOptions().timeZone, now).date
 }
 
+/** The browser's own IANA time zone. */
+export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/**
+ * "hora de Buenos Aires" when the room's zone differs from the browser's, so a time shown in room-local
+ * time is never mistaken for the viewer's own; `null` when they match.
+ */
+export function zoneLabel(timeZone: string, viewerZone = browserTimeZone()): string | null {
+  if (timeZone === viewerZone) return null
+  const city = timeZone.split('/').pop()!.replace(/_/g, ' ')
+  return `hora de ${city}`
+}
+
 export function formatTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('es', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(
     new Date(iso),
@@ -88,4 +101,28 @@ export function formatLongDate(date: string): string {
     day: 'numeric',
     month: 'long',
   }).format(new Date(`${date}T12:00:00Z`))
+}
+
+export const MIN_WEEKS = 2
+export const MAX_WEEKS = 12
+
+/** Dates of a weekly series: `first` and the same weekday for the next `weeks - 1` weeks (same rule as the API). */
+export function weeklyDates(first: string, weeks: number): string[] {
+  const start = new Date(`${first}T00:00:00Z`)
+  return Array.from({ length: weeks }, (_, i) => {
+    const d = new Date(start)
+    d.setUTCDate(d.getUTCDate() + 7 * i)
+    return d.toISOString().slice(0, 10)
+  })
+}
+
+/** Plain date "YYYY-MM-DD" → "lun, 23 nov" (no time zone involved). */
+export function formatPlainDate(date: string, options: Intl.DateTimeFormatOptions = {}): string {
+  return new Intl.DateTimeFormat('es', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...options,
+  }).format(new Date(`${date}T00:00:00Z`))
 }

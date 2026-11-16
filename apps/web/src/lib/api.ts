@@ -1,12 +1,19 @@
 import type {
-  Availability,
+  AdminReservation,
+  AdminReservationsQuery,
   AuthResponse,
-  MyReservations,
+  Availability,
+  PageParams,
+  Paginated,
+  RecurringReservationInput,
+  RecurringReservationResult,
   Reservation,
   ReservationInput,
+  ReservationScope,
   Room,
   RoomInput,
   User,
+  WeekAvailability,
 } from './types'
 
 /** Backend base URL from apps/web/.env (see .env.example). Fail loudly instead of calling the wrong host. */
@@ -90,6 +97,16 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
 const json = (body: unknown) => JSON.stringify(body)
 
+/** Builds a query string skipping empty values: `{ page: 2, search: '' }` → `?page=2`. */
+export function toQuery(params: object): string {
+  const q = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') q.set(key, String(value))
+  }
+  const str = q.toString()
+  return str ? `?${str}` : ''
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: json({ email, password }) }),
@@ -108,8 +125,15 @@ export const api = {
     return request<Availability>(`/availability?${q}`)
   },
 
+  week: (roomId: string, date: string) => request<WeekAvailability>(`/availability/week${toQuery({ roomId, date })}`),
+
   createReservation: (input: ReservationInput) =>
     request<Reservation>('/reservations', { method: 'POST', body: json(input) }),
-  myReservations: () => request<MyReservations>('/reservations/me'),
+  createRecurringReservation: (input: RecurringReservationInput) =>
+    request<RecurringReservationResult>('/reservations/recurring', { method: 'POST', body: json(input) }),
+  myReservations: (scope: ReservationScope, page: PageParams = {}) =>
+    request<Paginated<Reservation>>(`/reservations/me${toQuery({ scope, ...page })}`),
+  adminReservations: (query: AdminReservationsQuery = {}) =>
+    request<Paginated<AdminReservation>>(`/reservations${toQuery(query)}`),
   cancelReservation: (id: string) => request<Reservation>(`/reservations/${id}/cancel`, { method: 'POST' }),
 }

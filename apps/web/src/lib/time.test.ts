@@ -1,4 +1,4 @@
-import { validateSlot } from './time'
+import { formatPlainDate, validateSlot, weeklyDates, zoneLabel } from './time'
 
 const TZ = 'America/Argentina/Buenos_Aires' // UTC-3, no daylight saving time
 // "Now" = 2026-11-20 09:30 in Buenos Aires.
@@ -37,5 +37,24 @@ describe('validateSlot (section 4 rules in the frontend)', () => {
 
   it('requires empty fields', () => {
     expect(validateSlot(slot('', '11:00'), TZ, NOW)).toMatch(/Indica/)
+  })
+})
+
+describe('weeklyDates', () => {
+  it('repeats the same weekday every week, across months and years', () => {
+    expect(weeklyDates('2026-12-21', 3)).toEqual(['2026-12-21', '2026-12-28', '2027-01-04'])
+  })
+})
+
+describe('formatPlainDate', () => {
+  it('formats a plain date without shifting it by the browser time zone', () => {
+    expect(formatPlainDate('2026-11-23')).toBe('lun, 23 nov')
+  })
+})
+
+describe('zoneLabel', () => {
+  it('names the room zone only when it differs from the viewer', () => {
+    expect(zoneLabel('America/Argentina/Buenos_Aires', 'Europe/Madrid')).toBe('hora de Buenos Aires')
+    expect(zoneLabel('Europe/Madrid', 'Europe/Madrid')).toBeNull()
   })
 })

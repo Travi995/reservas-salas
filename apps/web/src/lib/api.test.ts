@@ -1,4 +1,4 @@
-import { ApiError, api, request, setUnauthorizedHandler, tokenStore } from './api'
+import { ApiError, api, request, setUnauthorizedHandler, toQuery, tokenStore } from './api'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -60,5 +60,12 @@ describe('API client', () => {
   it('turns a network failure into a clear message', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
     await expect(api.me()).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+  })
+
+  it('sends pagination and filters as query params, skipping empty ones', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [], meta: { page: 2, pageSize: 10, totalItems: 0, totalPages: 0 } }))
+    await api.adminReservations({ page: 2, pageSize: 10, search: '', status: 'active' })
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/reservations\?page=2&pageSize=10&status=active$/)
+    expect(toQuery({})).toBe('')
   })
 })
