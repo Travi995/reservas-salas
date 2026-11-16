@@ -10,7 +10,6 @@ import {
   PageLoader,
   Pagination,
   Select,
-  ViewportPage,
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -80,11 +79,13 @@ export function AvailabilityPage() {
   }
 
   return (
-    <ViewportPage>
+    // From `sm` up it behaves like ViewportPage (only the cards scroll). On phones the room cards are too tall for
+    // a fixed-height area under the filters, so there the page scrolls normally and the pagination ends the list.
+    <div className="flex flex-col sm:h-[calc(100svh-8.5rem)] sm:min-h-[30rem]">
       <PageHeader compact title="Disponibilidad" description={`Horarios ocupados del ${formatLongDate(date)}.`} />
 
-      <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
-        <div className="flex items-end gap-2">
+      <div className="mb-4 grid shrink-0 grid-cols-1 items-end gap-3 min-[400px]:grid-cols-2 sm:grid-cols-[auto_1fr_1fr]">
+        <div className="flex items-end gap-2 min-[400px]:col-span-2 sm:col-span-1">
           <Button
             variant="secondary"
             aria-label="Día anterior"
@@ -135,8 +136,8 @@ export function AvailabilityPage() {
         )
       ) : (
         <>
-          {/* Only this area scrolls; the filters above and the pagination below stay in place. */}
-          <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+          {/* From `sm` up only this area scrolls; the filters above and the pagination below stay in place. */}
+          <div className="sm:-mr-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:pr-2">
             <Stagger
               key={`${date}-${minCapacity}-${page}-${pageSize}`}
               className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-2 ${loading ? 'opacity-60' : ''}`}
@@ -192,6 +193,6 @@ export function AvailabilityPage() {
         onClose={() => setCancelling(null)}
         onDone={reload}
       />
-    </ViewportPage>
+    </div>
   )
 }
