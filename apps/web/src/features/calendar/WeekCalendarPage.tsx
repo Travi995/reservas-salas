@@ -54,6 +54,8 @@ export function WeekCalendarPage() {
 
   const week = useAsync(() => (roomId ? api.week(roomId, monday) : Promise.resolve(null)), [roomId, monday])
 
+  // Hour under the pointer: its «+» button is drawn above the reservation cards, which would otherwise cover it.
+  const [hover, setHover] = useState<{ date: string; minutes: number } | null>(null)
   const [booking, setBooking] = useState<{ date: string; startTime: string; endTime: string } | null>(null)
   const [cancelling, setCancelling] = useState<ReservationSlot | null>(null)
 
@@ -216,6 +218,13 @@ export function WeekCalendarPage() {
                       aria-label={formatPlainDate(d.date, { weekday: 'long', month: 'long' })}
                       className="relative border-l border-border"
                       style={{ height: (to - from) * PX }}
+                      onMouseMove={(e) => {
+                        const y = e.clientY - e.currentTarget.getBoundingClientRect().top
+                        const minutes = from + Math.floor(y / (60 * PX)) * 60
+                        if (minutes < from || minutes >= to) return
+                        setHover((h) => (h?.date === d.date && h.minutes === minutes ? h : { date: d.date, minutes }))
+                      }}
+                      onMouseLeave={() => setHover(null)}
                     >
                       {/* One button per hour to book it: keyboard reachable, disabled in the past. */}
                       {hours.map((m) => {
@@ -241,14 +250,7 @@ export function WeekCalendarPage() {
                               !bookable && 'cursor-default',
                             )}
                             style={{ top: (m - from) * PX, height: 60 * PX }}
-                          >
-                            {bookable && (
-                              <Plus
-                                aria-hidden="true"
-                                className="size-4 text-primary opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-                              />
-                            )}
-                          </button>
+                          ></button>
                         )
                       })}
 
@@ -326,6 +328,29 @@ export function WeekCalendarPage() {
                           )
                         })
                       })()}
+
+                      {/* «+» above the cards (z-30): shown for the hour under the pointer, also over a reservation. */}
+                      {hover?.date === d.date &&
+                        data.room.isActive &&
+                        !isInPast(d.date, hhmm(hover.minutes), tz, now) && (
+                          <button
+                            type="button"
+                            // The hour buttons are the accessible controls (keyboard, screen readers); this is the mouse shortcut.
+                            tabIndex={-1}
+                            aria-hidden="true"
+                            onClick={() =>
+                              setBooking({
+                                date: d.date,
+                                startTime: hhmm(hover.minutes),
+                                endTime: hhmm(Math.min(hover.minutes + 60, 23 * 60 + 45)),
+                              })
+                            }
+                            className="absolute right-1 z-30 flex size-6 cursor-pointer items-center justify-center rounded-md bg-primary text-primary-fg shadow-md transition-colors hover:bg-primary-hover"
+                            style={{ top: (hover.minutes - from) * PX + 2 }}
+                          >
+                            <Plus aria-hidden="true" className="size-4" />
+                          </button>
+                        )}
                     </section>
                   ))}
                 </div>
