@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
+import type { Env } from '../../config/env.validation.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
@@ -13,16 +14,20 @@ import { RolesGuard } from './guards/roles.guard.js';
     UsersModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService): JwtModuleOptions => ({
-        secret: config.getOrThrow<string>('JWT_SECRET'),
-        signOptions: { expiresIn: config.getOrThrow('JWT_EXPIRES_IN') },
+      useFactory: (config: ConfigService<Env, true>): JwtModuleOptions => ({
+        secret: config.get('JWT_SECRET', { infer: true }),
+        signOptions: {
+          expiresIn: config.get('JWT_EXPIRES_IN', {
+            infer: true,
+          }) as `${number}${'s' | 'm' | 'h' | 'd'}`,
+        },
       }),
     }),
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
-    // Orden importa: primero autenticación (401), luego autorización por rol (403).
+    // Order matters: authentication first (401), then role-based authorization (403).
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

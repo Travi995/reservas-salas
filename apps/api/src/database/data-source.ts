@@ -1,10 +1,15 @@
 import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
-
-// apps/api/.env (el CLI se ejecuta desde apps/api).
-config({ path: '.env', quiet: true });
+import { validateEnv } from '../config/env.validation.js';
+import { Room } from '../modules/rooms/entities/room.entity.js';
 import { User } from '../modules/users/entities/user.entity.js';
 import { databaseOptions } from './database.config.js';
 
-/** DataSource para el CLI de TypeORM (migration:run / revert) y el seed. */
-export default new DataSource({ ...databaseOptions(), entities: [User] });
+// apps/api/.env (the CLI runs from apps/api). Same validation as the app.
+config({ path: '.env', quiet: true });
+
+/** DataSource for the TypeORM CLI (migration:run / revert) and the seed. */
+export default new DataSource({
+  ...databaseOptions(validateEnv(process.env)),
+  entities: [User, Room],
+});

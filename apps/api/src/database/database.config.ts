@@ -1,21 +1,22 @@
 import type { DataSourceOptions } from 'typeorm';
+import type { Env } from '../config/env.validation.js';
 import { migrations } from './migrations/index.js';
 
-/** Opciones de Postgres compartidas por la app, el CLI de TypeORM y el seed. */
+/** Postgres options shared by the app, the TypeORM CLI and the seed. Takes an already validated env. */
 export function databaseOptions(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Pick<Env, 'DB_HOST' | 'DB_PORT' | 'DB_USER' | 'DB_PASSWORD' | 'DB_NAME'>,
 ): DataSourceOptions {
   return {
     type: 'postgres',
-    host: env.DB_HOST ?? 'localhost',
-    port: Number(env.DB_PORT ?? 5440),
-    username: env.DB_USER ?? 'reservas',
-    password: env.DB_PASSWORD ?? 'reservas',
-    database: env.DB_NAME ?? 'reservas',
-    // Esquema solo mediante migraciones explícitas (ADR-0002 / ADR-0003).
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    username: env.DB_USER,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME,
+    // Schema changes only through explicit migrations (ADR-0002 / ADR-0003).
     synchronize: false,
     migrations,
-    // Arrancar la API deja la BD al día: un solo comando para levantar el proyecto.
+    // Starting the API brings the database up to date: one command to run the project.
     migrationsRun: true,
   };
 }
