@@ -140,8 +140,8 @@ Todas las respuestas de error tienen el mismo formato, y el front muestra siempr
 | `GET /availability/week?roomId=…&date=YYYY-MM-DD` | autenticado (semana de lunes a domingo que contiene `date`) |
 | `POST /reservations` | autenticado |
 | `POST /reservations/recurring` (mismo cuerpo + `weeks: 2–12`) | autenticado |
-| `GET /reservations/me?scope=upcoming\|past&page=1&pageSize=10` | autenticado |
-| `GET /reservations?page&pageSize&search&status&scope&roomId` | admin |
+| `GET /reservations/me?scope=upcoming\|past&page=1&pageSize=10&sortBy=title&sortDir=desc` | autenticado |
+| `GET /reservations?page&pageSize&search&status&scope&roomId&sortBy&sortDir` | admin |
 | `POST /reservations/:id/cancel` | dueño o admin |
 | `GET /health` | público |
 | `GET /metrics` | admin |
@@ -172,6 +172,7 @@ Los listados paginados responden `{ items, meta: { page, pageSize, totalItems, t
 - **Email único y en minúsculas, garantizado por la BD:** `UNIQUE` + `CHECK (email = lower(email))`. Dos registros simultáneos con el mismo email terminan en `409`.
 - **Protección de la API:** cabeceras de seguridad con `helmet`, y login y registro limitados por IP (`AUTH_RATE_LIMIT`, 10 intentos por minuto por defecto → `429`). Swagger solo se expone fuera de producción.
 - **Cancelar es un cambio de estado** (`POST /reservations/:id/cancel`), no un borrado: el historial se conserva, junto con quién canceló (`cancelled_by`: el dueño o un admin). Dos cancelaciones a la vez se resuelven con un `UPDATE ... WHERE status = 'active'`.
+- **Orden por columna:** los listados de reservas aceptan `sortBy` (`date`, `time`, `title`, `room`, `user`, `status`) y `sortDir` (`asc`/`desc`). Es una lista blanca que elige una expresión SQL fija (nunca se interpola el valor), se resuelve en la BD y por tanto vale para todas las páginas, no solo la visible; los textos se comparan sin distinguir mayúsculas y `time` es la hora del día en la zona de la sala. Los empates caen en inicio e `id`. En la web, cada cabecera de tabla alterna ascendente → descendente → orden por defecto, y el estado vive en la URL (`?sort=title&dir=desc`). La tabla de Salas, que la API devuelve entera, se ordena y pagina en el navegador.
 - **Paginación en el servidor:**
   - Los listados de reservas (las mías y la del admin) se filtran, ordenan y paginan en la BD con `LIMIT/OFFSET` + `COUNT`; el front solo pide una página y pinta el `meta` que recibe.
   - Orden estable con desempate por `id`, para que no se repitan ni salten filas entre páginas.
@@ -240,6 +241,7 @@ Decisiones tomadas donde el enunciado no lo especifica:
 - **Avisar al dueño** (email o notificación) cuando un admin cancela su reserva. Hoy queda registrado y lo ve en «Mis reservas» («Cancelada por …»), y el diálogo se lo recuerda al admin.
 - **Series recurrentes:** hoy cada ocurrencia se cancela por separado; con más tiempo, «cancelar el resto de la serie» usando `series_id`, y otras frecuencias (diaria, cada 2 semanas).
 - **Paginación por cursor** (keyset sobre `starts_at, id`) si el volumen creciera mucho: `OFFSET` se degrada en páginas profundas. Y un índice trigram (`pg_trgm`) sobre `unaccent(...)` para la búsqueda.
+- **Horario de trabajo por sala:** no me dio tiempo a que cada sala defina en qué horas acepta reservas. Hoy el calendario semanal muestra por defecto de 08:00 a 20:00 (solo es el tramo visible, y se amplía si hay reservas fuera de él), pero la API acepta una reserva a cualquier hora del día. Con más tiempo, cada sala tendría su horario de apertura (y, si hiciera falta, por día de la semana), validado en el backend como una regla más (`422`) y reflejado en el formulario, la disponibilidad y el calendario.
 - **Editar reservas:** hoy solo se crean y se cancelan.
 - **Límite de peticiones compartido:** los contadores de login y registro viven en memoria de cada proceso; con varias instancias harían falta en Redis. Detrás de un proxy hay que activar `trust proxy` para que el límite sea por cliente y no por proxy.
 - **Observabilidad:** las métricas viven en memoria del proceso y se pierden al reiniciar. Con más tiempo, exportarlas a Prometheus u OpenTelemetry y mandar los logs JSON a un colector.
