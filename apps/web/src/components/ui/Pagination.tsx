@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { PageMeta } from '../../lib/types'
 import { cn } from './cn'
 import { pageWindow } from './page-window'
+import { Select } from './Select'
 
 interface PaginationProps {
   meta: PageMeta
@@ -9,13 +10,23 @@ interface PaginationProps {
   /** Disables the controls while the next page is loading. */
   disabled?: boolean
   className?: string
+  /** With both, a «por página» selector appears next to the counter. */
+  pageSizeOptions?: number[]
+  onPageSizeChange?: (size: number) => void
 }
 
 const BTN =
   'inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm font-medium tabular-nums transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40'
 
 /** Server-driven pagination: it only renders the `meta` the API sent and asks for another page. */
-export function Pagination({ meta, onPageChange, disabled, className }: PaginationProps) {
+export function Pagination({
+  meta,
+  onPageChange,
+  disabled,
+  className,
+  pageSizeOptions,
+  onPageSizeChange,
+}: PaginationProps) {
   const { page, pageSize, totalItems, totalPages } = meta
   if (totalItems === 0) return null
   const from = (page - 1) * pageSize + 1
@@ -26,9 +37,21 @@ export function Pagination({ meta, onPageChange, disabled, className }: Paginati
       aria-label="Paginación"
       className={cn('mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row', className)}
     >
-      <p className="text-sm text-muted-fg tabular-nums" aria-live="polite">
-        {from}–{to} de {totalItems}
-      </p>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+        <p className="text-sm text-muted-fg tabular-nums" aria-live="polite">
+          {from}–{to} de {totalItems}
+        </p>
+        {pageSizeOptions && onPageSizeChange && (
+          <Select
+            inline
+            label="Por página"
+            value={String(pageSize)}
+            onChange={(v) => onPageSizeChange(Number(v))}
+            disabled={disabled}
+            options={pageSizeOptions.map((n) => ({ value: String(n), label: String(n) }))}
+          />
+        )}
+      </div>
       {totalPages > 1 && (
         <ul className="flex items-center gap-1">
           <li>

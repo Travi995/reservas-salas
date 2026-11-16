@@ -2,7 +2,6 @@ import { CalendarCheck, History } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -10,23 +9,34 @@ import {
   PageHeader,
   PageLoader,
   Pagination,
+  ViewToggle,
+  ViewportPage,
   cn,
 } from '../../components/ui'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { formatDate, formatTime, zoneLabel } from '../../lib/time'
-import type { Reservation, ReservationScope } from '../../lib/types'
+import type { Reservation, ReservationScope, ReservationSortField } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
 import { useNow } from '../../lib/useNow'
+import { useViewMode } from '../../lib/useViewMode'
 import { motion } from 'motion/react'
 import { Stagger, StaggerItem } from '../../components/motion'
 import { spring } from '../../lib/motion'
 import { CancelReservationDialog } from './CancelReservationDialog'
-import { pageFromParams } from './url-state'
+import { ReservationBadges } from './ReservationBadges'
+import { ReservationsTable } from './ReservationsTable'
+import {
+  DEFAULT_PAGE_SIZE,
+  PAGE_SIZE_OPTIONS,
+  RESERVATION_SORT_FIELDS,
+  pageFromParams,
+  pageSizeFromParams,
+} from './url-state'
+import { nextSort, sortFromParams, writeSortParams, type SortState } from '../../lib/sort'
 
 type Tab = ReservationScope
 
-const PAGE_SIZE = 10
 const TABS: { id: Tab; label: string }[] = [
   { id: 'upcoming', label: 'Próximas' },
   { id: 'past', label: 'Pasadas' },
@@ -38,21 +48,30 @@ export function MyReservationsPage() {
   const [params, setParams] = useSearchParams()
   const tab: Tab = params.get('tab') === 'past' ? 'past' : 'upcoming'
   const page = pageFromParams(params)
-  const go = (next: { tab?: Tab; page?: number }) => {
+  const pageSize = pageSizeFromParams(params)
+  const sort = sortFromParams(params, RESERVATION_SORT_FIELDS)
+  // Changing tab or page size goes back to page 1; the chosen size is kept across tabs.
+  const go = (next: { tab?: Tab; page?: number; size?: number; sort?: SortState<ReservationSortField> | null }) => {
     const t = next.tab ?? tab
     const p = next.page ?? 1
+    const size = next.size ?? pageSize
     const q = new URLSearchParams()
     if (t !== 'upcoming') q.set('tab', t)
     if (p > 1) q.set('page', String(p))
+    if (size !== DEFAULT_PAGE_SIZE) q.set('size', String(size))
+    // The chosen order survives tab and page changes; `null` clears it.
+    writeSortParams(q, next.sort === undefined ? sort : next.sort)
     setParams(q)
   }
 
   // The server filters, orders and paginates; we only ask for the current tab's page.
   const { data, error, loading, reload } = useAsync(
-    () => api.myReservations(tab, { page, pageSize: PAGE_SIZE }).then((res) => ({ tab, res })),
-    [tab, page],
+    () =>
+      api.myReservations(tab, { page, pageSize, sortBy: sort?.by, sortDir: sort?.dir }).then((res) => ({ tab, res })),
+    [tab, page, pageSize, sort?.by, sort?.dir],
   )
   const [cancelling, setCancelling] = useState<Reservation | null>(null)
+  const [view, setView] = useViewMode()
   // Changing page keeps the current rows (dimmed) until the next ones arrive; changing tab does not:
   // the previous tab's rows and counter must never pass for this one's.
   const fresh = data?.tab === tab ? data.res : null
@@ -60,8 +79,9 @@ export function MyReservationsPage() {
   const outOfRange = fresh !== null && fresh.meta.totalPages > 0 && page > fresh.meta.totalPages
 
   return (
-    <>
+    <ViewportPage>
       <PageHeader
+        compact
         title="Mis reservas"
         actions={
           <Link
@@ -73,42 +93,46 @@ export function MyReservationsPage() {
         }
       />
 
-      <div
-        role="tablist"
-        aria-label="Reservas"
-        className="relative isolate mb-4 inline-flex w-full rounded-lg bg-muted p-1 sm:w-auto"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls="tab-panel"
-            onClick={() => go({ tab: t.id })}
-            className={cn(
-              'relative h-10 flex-1 rounded-md px-4 text-sm font-semibold transition-colors duration-150 sm:flex-none',
-              tab === t.id ? 'text-fg' : 'text-muted-fg hover:text-fg',
-            )}
-          >
-            {tab === t.id && (
-              <motion.span
-                layoutId="reservations-tab"
-                transition={spring}
-                className="absolute inset-0 -z-10 rounded-md bg-surface shadow-sm"
-              />
-            )}
-            {t.label} {/* Cancelled ones stay listed (marked), but are not «próximas»: the counter leaves them out. */}
-            {tab === t.id && fresh && (
-              <span className="text-muted-fg tabular-nums">
-                ({t.id === 'upcoming' ? fresh.meta.activeItems : fresh.meta.totalItems})
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div
+          role="tablist"
+          aria-label="Reservas"
+          className="relative isolate inline-flex w-full rounded-lg bg-muted p-1 sm:w-auto"
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              id={`tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls="tab-panel"
+              onClick={() => go({ tab: t.id })}
+              className={cn(
+                'relative h-10 flex-1 rounded-md px-4 text-sm font-semibold transition-colors duration-150 sm:flex-none',
+                tab === t.id ? 'text-fg' : 'text-muted-fg hover:text-fg',
+              )}
+            >
+              {tab === t.id && (
+                <motion.span
+                  layoutId="reservations-tab"
+                  transition={spring}
+                  className="absolute inset-0 -z-10 rounded-md bg-surface shadow-sm"
+                />
+              )}
+              {t.label}{' '}
+              {/* Cancelled ones stay listed (marked), but are not «próximas»: the counter leaves them out. */}
+              {tab === t.id && fresh && (
+                <span className="text-muted-fg tabular-nums">
+                  ({t.id === 'upcoming' ? fresh.meta.activeItems : fresh.meta.totalItems})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
-      <div role="tabpanel" id="tab-panel" aria-labelledby={`tab-${tab}`}>
+      <div role="tabpanel" id="tab-panel" aria-labelledby={`tab-${tab}`} className="flex min-h-0 flex-1 flex-col">
         {error ? (
           <ErrorState message={error.message} onRetry={reload} />
         ) : !fresh ? (
@@ -133,26 +157,49 @@ export function MyReservationsPage() {
           )
         ) : (
           <>
-            <Stagger
-              as="ul"
-              key={`${tab}-${fresh.meta.page}`}
-              aria-busy={loading}
-              className={cn('flex flex-col gap-3 transition-opacity', loading && 'opacity-60')}
-            >
-              {items.map((r) => (
-                <StaggerItem as="li" key={r.id}>
-                  <ReservationRow reservation={r} ownerId={user!.id} onCancel={() => setCancelling(r)} />
-                </StaggerItem>
-              ))}
-            </Stagger>
-            <Pagination meta={fresh.meta} onPageChange={(p) => go({ page: p })} disabled={loading} />
+            {/* Only this area scrolls; tabs above and pagination below stay in place. */}
+            <div className={cn('min-h-0 flex-1', view === 'cards' && '-mr-2 overflow-y-auto pr-2')}>
+              {view === 'table' ? (
+                <ReservationsTable
+                  key={`${tab}-${fresh.meta.page}`}
+                  reservations={items}
+                  ownerIdOf={() => user!.id}
+                  onCancel={(r) => setCancelling(r)}
+                  busy={loading}
+                  sort={sort}
+                  onSort={(field) => go({ sort: nextSort(sort, field) })}
+                />
+              ) : (
+                <Stagger
+                  as="ul"
+                  key={`${tab}-${fresh.meta.page}`}
+                  aria-busy={loading}
+                  className={cn('flex flex-col gap-3 transition-opacity', loading && 'opacity-60')}
+                >
+                  {items.map((r) => (
+                    <StaggerItem as="li" key={r.id}>
+                      <ReservationRow reservation={r} ownerId={user!.id} onCancel={() => setCancelling(r)} />
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              )}
+            </div>
+            <div className="shrink-0">
+              <Pagination
+                meta={fresh.meta}
+                onPageChange={(p) => go({ page: p })}
+                disabled={loading}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                onPageSizeChange={(size) => go({ size })}
+              />
+            </div>
           </>
         )}
       </div>
 
       {/* A cancelled upcoming reservation stays in «Próximas» (marked as cancelled), so the page keeps its rows. */}
       <CancelReservationDialog reservation={cancelling} onClose={() => setCancelling(null)} onDone={reload} />
-    </>
+    </ViewportPage>
   )
 }
 
@@ -194,14 +241,7 @@ export function ReservationRow({
         {details}
       </div>
       <div className="flex items-center gap-2">
-        {cancelled && (
-          <Badge>
-            {r.cancelledBy && r.cancelledBy.id !== ownerId ? `Cancelada por ${r.cancelledBy.name}` : 'Cancelada'}
-          </Badge>
-        )}
-        {ongoing && <Badge tone="info">En curso</Badge>}
-        {r.seriesId && <Badge tone="primary">Semanal</Badge>}
-        {!r.room.isActive && <Badge tone="warning">Sala desactivada</Badge>}
+        <ReservationBadges reservation={r} ownerId={ownerId} ongoing={ongoing} />
         {!cancelled && !started && (
           <Button
             variant="danger"

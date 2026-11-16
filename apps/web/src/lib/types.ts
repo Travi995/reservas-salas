@@ -90,9 +90,13 @@ export interface MyReservationsPage extends Paginated<Reservation> {
   meta: PageMeta & { activeItems: number }
 }
 
+export type ReservationSortField = 'date' | 'time' | 'title' | 'room' | 'user' | 'status'
+
 export interface PageParams {
   page?: number
   pageSize?: number
+  sortBy?: ReservationSortField
+  sortDir?: 'asc' | 'desc'
 }
 
 export interface AdminReservationsQuery extends PageParams {

@@ -10,18 +10,28 @@ import {
   PageLoader,
   Pagination,
   Select,
+  ViewToggle,
+  ViewportPage,
   cn,
 } from '../../components/ui'
 import { Stagger, StaggerItem } from '../../components/motion'
 import { api } from '../../lib/api'
-import type { AdminReservation, ReservationScope, ReservationStatus } from '../../lib/types'
+import type { AdminReservation, ReservationScope, ReservationSortField, ReservationStatus } from '../../lib/types'
 import { useAsync } from '../../lib/useAsync'
 import { useDebounced } from '../../lib/useDebounced'
+import { useViewMode } from '../../lib/useViewMode'
 import { CancelReservationDialog } from './CancelReservationDialog'
 import { ReservationRow } from './MyReservationsPage'
-import { pageFromParams } from './url-state'
+import { ReservationsTable } from './ReservationsTable'
+import {
+  DEFAULT_PAGE_SIZE,
+  PAGE_SIZE_OPTIONS,
+  RESERVATION_SORT_FIELDS,
+  pageFromParams,
+  pageSizeFromParams,
+} from './url-state'
+import { nextSort, sortFromParams, writeSortParams, type SortState } from '../../lib/sort'
 
-const PAGE_SIZE = 10
 const ALL = 'all'
 
 const STATUS_OPTIONS = [
@@ -35,7 +45,7 @@ const SCOPE_OPTIONS = [
   { value: 'past', label: 'Pasadas' },
 ]
 
-type FilterKey = 'q' | 'status' | 'scope' | 'room'
+type FilterKey = 'q' | 'status' | 'scope' | 'room' | 'size'
 
 /**
  * Admin listing of every reservation. Search, filters and pagination are resolved by the API;
@@ -48,15 +58,20 @@ export function AdminReservationsPage() {
   const scope = params.get('scope') ?? ALL
   const roomId = params.get('room') ?? ALL
   const page = pageFromParams(params)
+  const pageSize = pageSizeFromParams(params)
+  const sort = sortFromParams(params, RESERVATION_SORT_FIELDS)
 
   /** Changing any filter goes back to page 1; changing page keeps the filters. */
-  const update = (changes: Partial<Record<FilterKey, string>> & { page?: number }) => {
-    const { page: nextPage, ...filters } = changes
+  const update = (
+    changes: Partial<Record<FilterKey, string>> & { page?: number; sort?: SortState<ReservationSortField> | null },
+  ) => {
+    const { page: nextPage, sort: nextSortState, ...filters } = changes
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(filters)) {
-      if (!value || value === ALL) next.delete(key)
+      if (!value || value === ALL || (key === 'size' && Number(value) === DEFAULT_PAGE_SIZE)) next.delete(key)
       else next.set(key, value)
     }
+    if (nextSortState !== undefined) writeSortParams(next, nextSortState)
     if (nextPage && nextPage > 1) next.set('page', String(nextPage))
     else next.delete('page')
     setParams(next)
@@ -78,13 +93,15 @@ export function AdminReservationsPage() {
   const typing = search.trim() !== q
 
   const rooms = useAsync(() => api.rooms(true), [])
-  const filterKey = JSON.stringify([q, status, scope, roomId])
+  const filterKey = JSON.stringify([q, status, scope, roomId, pageSize, sort?.by, sort?.dir])
   const { data, error, loading, reload } = useAsync(
     () =>
       api
         .adminReservations({
           page,
-          pageSize: PAGE_SIZE,
+          pageSize,
+          sortBy: sort?.by,
+          sortDir: sort?.dir,
           search: q || undefined,
           status: status === ALL ? undefined : (status as ReservationStatus),
           scope: scope === ALL ? undefined : (scope as ReservationScope),
@@ -94,6 +111,7 @@ export function AdminReservationsPage() {
     [page, filterKey],
   )
   const [cancelling, setCancelling] = useState<AdminReservation | null>(null)
+  const [view, setView] = useViewMode()
 
   const result = data?.res ?? null
   // Rows from other filters stay visible but dimmed while the new ones load (or while typing).
@@ -107,10 +125,15 @@ export function AdminReservationsPage() {
   const filtered = Boolean(q) || status !== ALL || scope !== ALL || roomId !== ALL
 
   return (
-    <>
-      <PageHeader title="Reservas" description="Todas las reservas de todas las salas. Busca, filtra y cancela." />
+    <ViewportPage>
+      <PageHeader
+        compact
+        title="Reservas"
+        description="Todas las reservas de todas las salas. Busca, filtra y cancela."
+        actions={<ViewToggle value={view} onChange={setView} />}
+      />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-3 grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="relative sm:col-span-2 lg:col-span-1">
           <InputField
             label="Buscar"
@@ -127,8 +150,18 @@ export function AdminReservationsPage() {
         <Select label="Sala" options={roomOptions} value={roomId} onChange={(v) => update({ room: v })} />
       </div>
       {filtered && (
-        <div className="mb-4 -mt-1 flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+        <div className="mb-3 -mt-1 flex shrink-0 justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setParams(
+                pageSize === DEFAULT_PAGE_SIZE
+                  ? new URLSearchParams()
+                  : new URLSearchParams({ size: String(pageSize) }),
+              )
+            }
+          >
             <FilterX aria-hidden="true" className="size-4" /> Quitar filtros
           </Button>
         </div>
@@ -152,31 +185,55 @@ export function AdminReservationsPage() {
         </div>
       ) : (
         <>
-          <Stagger
-            as="ul"
-            key={`${data?.filterKey}-${result.meta.page}`}
-            aria-busy={stale}
-            className={cn('flex flex-col gap-3 transition-opacity', stale && 'opacity-60')}
-          >
-            {result.items.map((r) => (
-              <StaggerItem as="li" key={r.id}>
-                <ReservationRow
-                  reservation={r}
-                  ownerId={r.user.id}
-                  onCancel={() => setCancelling(r)}
-                  details={
-                    <p className="mt-1 flex min-w-0 items-center gap-1 text-sm text-muted-fg">
-                      <UserRound aria-hidden="true" className="size-4 shrink-0" />
-                      <span className="truncate">
-                        {r.user.name} · {r.user.email}
-                      </span>
-                    </p>
-                  }
-                />
-              </StaggerItem>
-            ))}
-          </Stagger>
-          <Pagination meta={result.meta} onPageChange={(p) => update({ page: p })} disabled={stale} />
+          {/* Only this area scrolls; filters above and pagination below stay in place. */}
+          <div className={cn('min-h-0 flex-1', view === 'cards' && '-mr-2 overflow-y-auto pr-2')}>
+            {view === 'table' ? (
+              <ReservationsTable
+                key={`${data?.filterKey}-${result.meta.page}`}
+                reservations={result.items}
+                ownerIdOf={(r) => (r as AdminReservation).user.id}
+                showUser
+                onCancel={(r) => setCancelling(r as AdminReservation)}
+                busy={stale}
+                sort={sort}
+                onSort={(field) => update({ sort: nextSort(sort, field) })}
+              />
+            ) : (
+              <Stagger
+                as="ul"
+                key={`${data?.filterKey}-${result.meta.page}`}
+                aria-busy={stale}
+                className={cn('flex flex-col gap-3 transition-opacity', stale && 'opacity-60')}
+              >
+                {result.items.map((r) => (
+                  <StaggerItem as="li" key={r.id}>
+                    <ReservationRow
+                      reservation={r}
+                      ownerId={r.user.id}
+                      onCancel={() => setCancelling(r)}
+                      details={
+                        <p className="mt-1 flex min-w-0 items-center gap-1 text-sm text-muted-fg">
+                          <UserRound aria-hidden="true" className="size-4 shrink-0" />
+                          <span className="truncate">
+                            {r.user.name} · {r.user.email}
+                          </span>
+                        </p>
+                      }
+                    />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            )}
+          </div>
+          <div className="shrink-0">
+            <Pagination
+              meta={result.meta}
+              onPageChange={(p) => update({ page: p })}
+              disabled={stale}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={(size) => update({ size: String(size) })}
+            />
+          </div>
         </>
       )}
 
@@ -189,6 +246,6 @@ export function AdminReservationsPage() {
           else reload()
         }}
       />
-    </>
+    </ViewportPage>
   )
 }

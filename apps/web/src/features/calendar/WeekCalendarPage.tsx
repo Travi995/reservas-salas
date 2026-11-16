@@ -1,5 +1,5 @@
 import { CalendarX2, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   Button,
@@ -10,6 +10,7 @@ import {
   PageHeader,
   PageLoader,
   Select,
+  ViewportPage,
   cn,
 } from '../../components/ui'
 import { api } from '../../lib/api'
@@ -22,8 +23,11 @@ import { CancelReservationDialog } from '../reservations/CancelReservationDialog
 import { ReservationDialog } from '../reservations/ReservationDialog'
 import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 
-/** Pixels per minute: one hour = 48 px. */
-const PX = 0.8
+/** Pixels per minute. The grid adapts to the height available (so the page needs no scroll), within these bounds. */
+const PX_MIN = 0.5
+const PX_MAX = 1
+/** Height of the sticky row with the day names, which is not part of the hours area. */
+const HEADER_PX = 40
 
 export function WeekCalendarPage() {
   const { user } = useAuth()
@@ -54,6 +58,19 @@ export function WeekCalendarPage() {
     setParams(next, { replace: true })
   }
 
+  // The calendar fills the space the page leaves; its hours are scaled to fit, and only if they cannot
+  // (very short window) the card scrolls inside itself, with the day names pinned.
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
+  const [areaHeight, setAreaHeight] = useState(0)
+  useEffect(() => {
+    if (!scroller) return
+    const measure = () => setAreaHeight(scroller.clientHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [scroller])
+
   const data = week.data
   const room = data?.room
   const tz = room?.timezone ?? 'UTC'
@@ -62,6 +79,7 @@ export function WeekCalendarPage() {
   const hours: number[] = []
   for (let m = from; m < to; m += 60) hours.push(m)
   const roomNow = nowIn(tz, now)
+  const PX = areaHeight > 0 ? Math.min(PX_MAX, Math.max(PX_MIN, (areaHeight - HEADER_PX) / (to - from))) : PX_MAX
 
   const canCancel = (s: ReservationSlot) =>
     (user?.role === 'admin' || s.userId === user?.id) && new Date(s.startsAt) > now
@@ -73,10 +91,17 @@ export function WeekCalendarPage() {
   if (rooms.loading && !rooms.data) return <PageLoader />
 
   return (
-    <>
+    <ViewportPage>
       <PageHeader
+        compact
         title="Calendario semanal"
-        description={room ? `${room.name} · semana del ${weekLabel} · hora local de ${zoneCity(tz)}` : undefined}
+        actions={
+          room && (
+            <p className="text-sm text-muted-fg">
+              {room.name} · {weekLabel} · hora de {zoneCity(tz)}
+            </p>
+          )
+        }
       />
 
       {rooms.error ? (
@@ -87,7 +112,7 @@ export function WeekCalendarPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
+          <div className="mb-3 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
             <div className="flex items-end gap-2">
               <Button
                 variant="secondary"
@@ -132,25 +157,33 @@ export function WeekCalendarPage() {
           ) : !data ? (
             <PageLoader />
           ) : (
-            <Card className={cn('overflow-hidden p-0 transition-opacity', week.loading && 'opacity-60')}>
+            <Card
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden p-0 transition-opacity',
+                week.loading && 'opacity-60',
+              )}
+            >
               {!data.room.isActive && (
                 <p className="border-b border-border bg-warning-soft px-4 py-2 text-sm text-warning">
                   Sala desactivada: se muestran sus reservas, pero no acepta nuevas.
                 </p>
               )}
-              {/* The grid scrolls sideways inside the card on narrow screens; the page itself never does. */}
-              <div className="overflow-x-auto">
+              {/* Scrolls inside the card (sideways on narrow screens, vertically if the hours do not fit); the page itself never does. */}
+              <div ref={setScroller} className="min-h-0 flex-1 overflow-auto">
                 <div className="grid min-w-[44rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]">
-                  <div className="sticky left-0 z-20 border-b border-border bg-surface" />
+                  <div className="sticky top-0 left-0 z-30 border-b border-border bg-surface" />
                   {data.days.map((d) => (
                     <div
                       key={d.date}
                       className={cn(
-                        'border-b border-l border-border px-2 py-2 text-center text-sm',
+                        'sticky top-0 z-20 flex items-center justify-center border-b border-l border-border bg-surface text-center text-sm',
                         d.date === roomNow.date && 'bg-primary-soft font-semibold text-primary',
                       )}
                     >
-                      <span className="inline-block first-letter:uppercase">
+                      <span
+                        className="inline-block first-letter:uppercase"
+                        style={{ height: HEADER_PX - 1, lineHeight: `${HEADER_PX - 1}px` }}
+                      >
                         {formatPlainDate(d.date, { month: undefined })}
                       </span>
                     </div>
@@ -257,7 +290,7 @@ export function WeekCalendarPage() {
             </Card>
           )}
 
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-fg" aria-label="Leyenda">
+          <ul className="mt-2 flex shrink-0 flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-fg" aria-label="Leyenda">
             <li className="flex items-center gap-2">
               <span aria-hidden="true" className="size-3 rounded-sm border-l-4 border-primary bg-primary-soft" /> Tus
               reservas
@@ -291,6 +324,6 @@ export function WeekCalendarPage() {
         onClose={() => setCancelling(null)}
         onDone={week.reload}
       />
-    </>
+    </ViewportPage>
   )
 }

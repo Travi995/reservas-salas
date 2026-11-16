@@ -25,6 +25,26 @@ describe('Pagination', () => {
     expect(onPageChange).toHaveBeenCalledWith(3)
   })
 
+  it('offers a page-size selector only when asked, and reports the chosen size', async () => {
+    const onPageSizeChange = vi.fn()
+    const { rerender } = render(<Pagination meta={meta} onPageChange={() => {}} />)
+    expect(screen.queryByRole('combobox', { name: 'Por página' })).not.toBeInTheDocument()
+
+    rerender(
+      <Pagination
+        meta={meta}
+        onPageChange={() => {}}
+        pageSizeOptions={[5, 10, 20]}
+        onPageSizeChange={onPageSizeChange}
+      />,
+    )
+    const select = screen.getByRole('combobox', { name: 'Por página' })
+    expect(select).toHaveTextContent('10')
+    await userEvent.click(select)
+    await userEvent.click(screen.getByRole('option', { name: '20' }))
+    expect(onPageSizeChange).toHaveBeenCalledWith(20)
+  })
+
   it('renders nothing for an empty list', () => {
     const { container } = render(
       <Pagination meta={{ ...meta, totalItems: 0, totalPages: 0, page: 1 }} onPageChange={() => {}} />,
