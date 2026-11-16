@@ -3,15 +3,15 @@ import type { ReactNode } from 'react'
 import { ease } from '../lib/motion'
 
 /**
- * Lenguaje de movimiento estándar (ADR-0008). Todo el sitio usa estas piezas,
- * nunca duraciones sueltas. MotionConfig reducedMotion="user" (App.tsx) las desactiva
- * si el sistema pide menos movimiento.
+ * Standard motion language (ADR-0008). The whole site uses these pieces,
+ * never ad-hoc durations. MotionConfig reducedMotion="user" (App.tsx) disables them
+ * when the system requests reduced motion.
  */
 
 const list: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 const item: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: ease } }
 
-/** Contenedor que hace entrar a sus <StaggerItem> en cascada. */
+/** Container that brings in its <StaggerItem> children in a staggered cascade. */
 export function Stagger({
   as = 'div',
   className,
@@ -46,7 +46,7 @@ export function StaggerItem({
   )
 }
 
-/** Entrada simple (sube y aparece). */
+/** Simple entrance (slides up and fades in). */
 export function FadeIn({
   delay = 0,
   className,

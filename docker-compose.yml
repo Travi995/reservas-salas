@@ -10,7 +10,7 @@ services:
     ports:
       - '${DB_PORT:-5440}:5432'
     volumes:
-      # Los datos quedan dentro del proyecto (ignorado en git).
+      # Data stays inside the project (ignored by git).
       - ./data_postgres:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']

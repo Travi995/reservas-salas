@@ -7,7 +7,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.f
 describe('applyApiError', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('pone los errores de campo de la API debajo de su campo, sin toast', () => {
+  it('puts API field errors below their field, without a toast', () => {
     const setError = vi.fn()
     const error = new ApiError(400, 'VALIDATION_ERROR', 'Datos inválidos', [
       { field: 'email', message: 'Email no válido' },
@@ -21,7 +21,7 @@ describe('applyApiError', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('muestra un toast con el mensaje de la API si no hay error de campo (p. ej. 409)', () => {
+  it('shows a toast with the API message when there is no field error (e.g. 409)', () => {
     const setError = vi.fn()
     applyApiError(new ApiError(409, 'ROOM_OVERLAP', 'La sala ya está reservada.'), setError, ['title'])
     expect(setError).not.toHaveBeenCalled()

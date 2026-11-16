@@ -11,8 +11,8 @@ interface DialogProps {
 }
 
 /**
- * Diálogo modal sobre <dialog> nativo: foco atrapado, Escape y backdrop gratis.
- * En móvil ocupa el ancho completo desde abajo; desde `sm` va centrado.
+ * Modal dialog on top of native <dialog>: focus trap, Escape and backdrop for free.
+ * On mobile it spans the full width from the bottom; from `sm` up it is centered.
  */
 export function Dialog({ open, onClose, title, children }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)

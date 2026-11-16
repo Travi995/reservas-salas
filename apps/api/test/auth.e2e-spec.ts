@@ -19,7 +19,7 @@ describe('Auth (e2e)', () => {
   afterAll(() => ctx.app.close());
 
   describe('POST /api/auth/register', () => {
-    it('201: crea un member, normaliza el email y no devuelve la contraseña', async () => {
+    it('201: creates a member, normalizes the email and does not return the password', async () => {
       const res = await http()
         .post('/api/auth/register')
         .send({
@@ -39,7 +39,7 @@ describe('Auth (e2e)', () => {
       expect(JSON.stringify(res.body)).not.toContain('password');
     });
 
-    it('guarda la contraseña como hash argon2id, no en texto plano', async () => {
+    it('stores the password as an argon2id hash, not in plain text', async () => {
       await http()
         .post('/api/auth/register')
         .send({ name: 'Ana', email: 'ana@demo.com', password: 'password123' });
@@ -50,7 +50,7 @@ describe('Auth (e2e)', () => {
       expect(row.password_hash).not.toContain('password123');
     });
 
-    it('rechaza un rol enviado en el body: 400 por campo no permitido', async () => {
+    it('rejects a role sent in the body: 400 for a non-whitelisted field', async () => {
       const res = await http()
         .post('/api/auth/register')
         .send({
@@ -63,7 +63,7 @@ describe('Auth (e2e)', () => {
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('400: errores de validación por campo', async () => {
+    it('400: per-field validation errors', async () => {
       const res = await http()
         .post('/api/auth/register')
         .send({ name: '', email: 'no-email', password: '123' })
@@ -84,7 +84,7 @@ describe('Auth (e2e)', () => {
       );
     });
 
-    it('409: email ya registrado (sin distinguir mayúsculas)', async () => {
+    it('409: email already registered (case-insensitive)', async () => {
       await createUser(ctx.db, {
         email: 'ana@demo.com',
         password: 'password123',
@@ -106,7 +106,7 @@ describe('Auth (e2e)', () => {
       }),
     );
 
-    it('200: devuelve token y usuario', async () => {
+    it('200: returns token and user', async () => {
       const res = await http()
         .post('/api/auth/login')
         .send({ email: 'Admin@demo.com', password: 'password123' })
@@ -114,7 +114,7 @@ describe('Auth (e2e)', () => {
       expect(res.body.user.role).toBe('admin');
     });
 
-    it('401: mismo mensaje para contraseña errónea y email inexistente', async () => {
+    it('401: same message for wrong password and unknown email', async () => {
       const wrong = await http()
         .post('/api/auth/login')
         .send({ email: 'admin@demo.com', password: 'nope' })
@@ -130,13 +130,13 @@ describe('Auth (e2e)', () => {
       });
     });
 
-    it('400: body mal formado', async () => {
+    it('400: malformed body', async () => {
       await http().post('/api/auth/login').send({ email: 'x' }).expect(400);
     });
   });
 
   describe('GET /api/auth/me', () => {
-    it('200 con Bearer token válido', async () => {
+    it('200 with a valid Bearer token', async () => {
       const { token } = await loginAs(ctx, 'ana@demo.com');
       const res = await http()
         .get('/api/auth/me')
@@ -145,12 +145,12 @@ describe('Auth (e2e)', () => {
       expect(res.body.email).toBe('ana@demo.com');
     });
 
-    it('401 sin token', async () => {
+    it('401 without a token', async () => {
       const res = await http().get('/api/auth/me').expect(401);
       expect(res.body.error.code).toBe('UNAUTHORIZED');
     });
 
-    it('401 con token inválido o con esquema que no es Bearer', async () => {
+    it('401 with an invalid token or a non-Bearer scheme', async () => {
       await http()
         .get('/api/auth/me')
         .set('Authorization', 'Bearer abc.def.ghi')
@@ -162,7 +162,7 @@ describe('Auth (e2e)', () => {
         .expect(401);
     });
 
-    it('401 si el usuario del token ya no existe', async () => {
+    it("401 if the token's user no longer exists", async () => {
       const { token } = await loginAs(ctx, 'ana@demo.com');
       await resetDb(ctx.db);
       const res = await http()
@@ -173,7 +173,7 @@ describe('Auth (e2e)', () => {
     });
   });
 
-  it('404 con el formato de error único en rutas inexistentes', async () => {
+  it('404 with the unified error format on unknown routes', async () => {
     const res = await http().get('/api/no-existe').expect(404);
     expect(res.body).toEqual({
       error: { code: 'NOT_FOUND', message: 'El recurso no existe.' },

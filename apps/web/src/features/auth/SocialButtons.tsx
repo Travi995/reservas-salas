@@ -1,5 +1,5 @@
-// Inicio de sesión con proveedores externos: solo visual por ahora (fuera de alcance, ADR-0005).
-// lucide-react ya no incluye logos de marca, así que van como SVG inline.
+// Sign-in with external providers: visual only for now (out of scope, ADR-0005).
+// lucide-react no longer ships brand logos, so they are inline SVGs.
 
 function GoogleIcon() {
   return (

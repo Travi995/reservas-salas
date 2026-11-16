@@ -14,7 +14,7 @@ export interface TestContext {
   db: DataSource;
 }
 
-/** Levanta la app real (mismos pipes, filtros y guards que en producción) contra la BD de test. */
+/** Boots the real app (same pipes, filters and guards as in production) against the test DB. */
 export async function createTestApp(): Promise<TestContext> {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -26,7 +26,7 @@ export async function createTestApp(): Promise<TestContext> {
   return { app, db: app.get(DataSource) };
 }
 
-/** Vacía todas las tablas de datos entre tests. */
+/** Empties all data tables between tests. */
 export async function resetDb(db: DataSource) {
   const tables = db.entityMetadatas.map((m) => `"${m.tableName}"`).join(', ');
   await db.query(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);
@@ -44,7 +44,7 @@ export async function createUser(
   });
 }
 
-/** Crea un usuario y devuelve su token. */
+/** Creates a user and returns their token. */
 export async function loginAs(
   ctx: TestContext,
   email: string,

@@ -12,7 +12,7 @@ interface FieldShellProps {
   className?: string
 }
 
-/** Label visible + control + ayuda/error asociado por aria-describedby. */
+/** Visible label + control + help/error linked via aria-describedby. */
 function FieldShell({ label, error, hint, children, className }: FieldShellProps) {
   const id = useId()
   const msgId = `${id}-msg`

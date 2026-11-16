@@ -14,8 +14,8 @@ import type { AuthUser } from '../interfaces/auth-user.interface.js';
 import type { JwtPayload } from '../interfaces/jwt-payload.interface.js';
 
 /**
- * Guard global: exige `Authorization: Bearer <jwt>` salvo en rutas @Public().
- * Carga el usuario desde la BD en cada petición: si se borra o cambia de rol, el token viejo no lo «recuerda».
+ * Global guard: requires `Authorization: Bearer <jwt>` except on @Public() routes.
+ * Loads the user from the DB on every request: if they are deleted or their role changes, the old token does not "remember" it.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {

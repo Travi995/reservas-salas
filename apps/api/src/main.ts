@@ -6,7 +6,7 @@ import { configureApp } from './app.setup.js';
 async function bootstrap() {
   const app = configureApp(await NestFactory.create(AppModule));
 
-  // El front habla con la API vía proxy de Vite; CORS solo para orígenes configurados.
+  // The frontend talks to the API through the Vite proxy; CORS only for configured origins.
   app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
 
   const swaggerConfig = new DocumentBuilder()

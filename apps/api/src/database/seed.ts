@@ -3,7 +3,7 @@ import { User } from '../modules/users/entities/user.entity.js';
 import { Role } from '../modules/users/enums/role.enum.js';
 import dataSource from './data-source.js';
 
-/** Usuarios de prueba (documentados en el README). Idempotente: no duplica si ya existen. */
+/** Test users (documented in the README). Idempotent: does not duplicate them if they already exist. */
 const DEMO_USERS = [
   {
     name: 'Admin Demo',

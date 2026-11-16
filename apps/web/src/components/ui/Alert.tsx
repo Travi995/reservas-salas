@@ -12,7 +12,7 @@ const TONES: Record<Tone, { box: string; Icon: typeof Info }> = {
   info: { box: 'border-info/30 bg-info-soft text-info', Icon: Info },
 }
 
-/** Mensaje en línea. Los errores se anuncian a lectores de pantalla (role=alert). */
+/** Inline message. Errors are announced to screen readers (role=alert). */
 export function Alert({
   tone = 'danger',
   children,

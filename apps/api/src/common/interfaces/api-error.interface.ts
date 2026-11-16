@@ -1,10 +1,10 @@
-/** Error de un campo concreto (solo en 400 de validación). */
+/** Error for a specific field (only in validation 400s). */
 export interface FieldError {
   field: string;
   message: string;
 }
 
-/** Formato único de error de la API (ADR-0009). */
+/** Unified API error format (ADR-0009). */
 export interface ApiErrorBody {
   error: {
     code: string;

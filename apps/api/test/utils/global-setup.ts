@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import pg from 'pg';
 
-/** Crea la base de datos de test si no existe (las migraciones las corre la propia app al arrancar). */
+/** Creates the test database if it does not exist (the app itself runs the migrations on startup). */
 export default async function setup() {
   config({ path: '.env', quiet: true });
   const client = new pg.Client({

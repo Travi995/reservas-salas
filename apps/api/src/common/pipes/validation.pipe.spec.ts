@@ -22,7 +22,7 @@ describe('createValidationPipe', () => {
   const validate = (body: unknown) =>
     pipe.transform(body, { type: 'body', metatype: Dto });
 
-  it('lanza 400 VALIDATION_ERROR con un error por campo, incluidos los anidados', async () => {
+  it('throws 400 VALIDATION_ERROR with one error per field, including nested ones', async () => {
     const error = await validate({ capacity: 0, child: { value: 1.5 } }).catch(
       (e: unknown) => e,
     );
@@ -40,7 +40,7 @@ describe('createValidationPipe', () => {
     });
   });
 
-  it('rechaza propiedades que el DTO no declara', async () => {
+  it('rejects properties the DTO does not declare', async () => {
     const error = (await validate({
       capacity: 2,
       child: { value: 1 },

@@ -4,7 +4,7 @@ import type { AuthResponse, User } from './types'
 
 interface AuthContextValue {
   user: User | null
-  /** true mientras se valida el token guardado al cargar la app. */
+  /** true while the stored token is being validated on app load. */
   checking: boolean
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>

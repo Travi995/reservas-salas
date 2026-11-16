@@ -5,8 +5,8 @@ import type {
 } from '../interfaces/api-error.interface.js';
 
 /**
- * Excepción de dominio con código estable y mensaje para el usuario.
- * Todos los errores esperados de la API se lanzan con esta clase.
+ * Domain exception with a stable code and a user-facing message.
+ * Every expected API error is thrown with this class.
  */
 export class AppException extends HttpException {
   constructor(

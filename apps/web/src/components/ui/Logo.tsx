@@ -1,6 +1,6 @@
 import { cn } from './cn'
 
-/** Marca: tres franjas horarias, la central ocupada. Mismo dibujo que public/favicon.svg. */
+/** Brand mark: three time slots, the middle one booked. Same drawing as public/favicon.svg. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true" className={cn('size-8 shrink-0', className)}>

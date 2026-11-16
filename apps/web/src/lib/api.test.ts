@@ -3,7 +3,7 @@ import { ApiError, api, request, setUnauthorizedHandler, tokenStore } from './ap
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
-describe('cliente API', () => {
+describe('API client', () => {
   const fetchMock = vi.fn<typeof fetch>()
 
   beforeEach(() => {
@@ -12,7 +12,7 @@ describe('cliente API', () => {
     localStorage.clear()
   })
 
-  it('envía el JWT como Bearer token', async () => {
+  it('sends the JWT as a Bearer token', async () => {
     tokenStore.set('abc.def.ghi')
     fetchMock.mockResolvedValue(json(200, { id: '1' }))
     await api.me()
@@ -20,7 +20,7 @@ describe('cliente API', () => {
     expect(headers.get('Authorization')).toBe('Bearer abc.def.ghi')
   })
 
-  it('convierte el formato de error de la API en ApiError', async () => {
+  it('converts the API error format into an ApiError', async () => {
     fetchMock.mockResolvedValue(
       json(409, { error: { code: 'ROOM_OVERLAP', message: 'La sala ya está reservada de 10:00 a 11:00' } }),
     )
@@ -33,7 +33,7 @@ describe('cliente API', () => {
     })
   })
 
-  it('usa un mensaje entendible si el cuerpo no trae uno', async () => {
+  it('uses a readable message when the body has none', async () => {
     fetchMock.mockResolvedValue(new Response('boom', { status: 403 }))
     await expect(request('/rooms')).rejects.toMatchObject({
       status: 403,
@@ -41,7 +41,7 @@ describe('cliente API', () => {
     })
   })
 
-  it('cierra la sesión ante un 401 con token, pero no en el login', async () => {
+  it('logs out on a 401 with a token, but not on login', async () => {
     const onUnauthorized = vi.fn()
     setUnauthorizedHandler(onUnauthorized)
 
@@ -57,7 +57,7 @@ describe('cliente API', () => {
     expect(onUnauthorized).toHaveBeenCalledOnce()
   })
 
-  it('traduce un fallo de red a un mensaje claro', async () => {
+  it('turns a network failure into a clear message', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
     await expect(api.me()).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
   })

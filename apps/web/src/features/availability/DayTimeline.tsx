@@ -6,13 +6,13 @@ const DEFAULT_START = 8 * 60
 const DEFAULT_END = 20 * 60
 
 /**
- * Franja visual del día (08:00–20:00, se amplía si hay reservas fuera).
- * Es decorativa: la lista de horarios debajo es la fuente accesible.
+ * Visual strip of the day (08:00–20:00, widened if there are bookings outside it).
+ * It is decorative: the time slot list below is the accessible source.
  */
 export function DayTimeline({ slots, timeZone }: { slots: ReservationSlot[]; timeZone: string }) {
   const ranges = slots.map((s) => {
     const start = minutesOfDay(s.startsAt, timeZone)
-    const end = minutesOfDay(s.endsAt, timeZone) || 24 * 60 // fin a medianoche
+    const end = minutesOfDay(s.endsAt, timeZone) || 24 * 60 // end at midnight
     return { id: s.id, start, end, label: `${formatTime(s.startsAt, timeZone)}–${formatTime(s.endsAt, timeZone)}` }
   })
   const from = Math.floor(Math.min(DEFAULT_START, ...ranges.map((r) => r.start)) / 60) * 60
@@ -46,7 +46,7 @@ export function DayTimeline({ slots, timeZone }: { slots: ReservationSlot[]; tim
               'absolute -translate-x-1/2',
               i === 0 && 'translate-x-0',
               i === hours.length - 1 && '-translate-x-full',
-              // En pantallas estrechas solo una etiqueta de cada tres horas.
+              // On narrow screens, only one label every three hours.
               i % 3 !== 0 && 'hidden md:inline',
             )}
             style={{ left: pct(h) }}

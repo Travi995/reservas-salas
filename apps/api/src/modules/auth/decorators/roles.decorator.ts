@@ -3,5 +3,5 @@ import type { Role } from '../../users/enums/role.enum.js';
 
 export const ROLES_KEY = 'roles';
 
-/** Restringe una ruta a ciertos roles: `@Roles(Role.Admin)`. Sin decorador = cualquier usuario autenticado. */
+/** Restricts a route to certain roles: `@Roles(Role.Admin)`. No decorator = any authenticated user. */
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);

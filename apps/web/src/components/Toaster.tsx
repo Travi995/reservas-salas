@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { Toaster as Sonner } from 'sonner'
 import { useTheme } from '../lib/theme'
 
-/** Toaster global (montado una vez en App). Colores desde los tokens del sistema de diseño. */
+/** Global toaster (mounted once in App). Colors come from the design system tokens. */
 export function Toaster() {
   const { theme } = useTheme()
   return (

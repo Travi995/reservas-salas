@@ -28,7 +28,7 @@ export class UsersService {
     return this.users.findOneBy({ id });
   }
 
-  /** Incluye el hash de la contraseña (solo para el login). */
+  /** Includes the password hash (for login only). */
   findByEmailWithPassword(email: string) {
     return this.users
       .createQueryBuilder('u')
@@ -44,11 +44,11 @@ export class UsersService {
     });
     try {
       const saved = await this.users.save(user);
-      // No devolver el hash recién guardado.
+      // Do not return the freshly stored hash.
       const { passwordHash: _, ...rest } = saved;
       return rest as User;
     } catch (e) {
-      // El índice único es la garantía (dos registros simultáneos con el mismo email).
+      // The unique index is the real guarantee (two concurrent registrations with the same email).
       if (
         e instanceof QueryFailedError &&
         (e.driverError as { code?: string }).code === UNIQUE_VIOLATION

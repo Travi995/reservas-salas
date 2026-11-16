@@ -2,13 +2,13 @@
 @import '@fontsource-variable/plus-jakarta-sans';
 
 /*
- * Sistema de diseño (ADR-0008). Fuente única de verdad:
- * los componentes usan SOLO estos tokens semánticos, nunca hex sueltos.
+ * Design system (ADR-0008). Single source of truth:
+ * components use ONLY these semantic tokens, never raw hex values.
  */
 @theme {
   --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
 
-  /* Breakpoints mobile-first. Base = 320px (mínimo soportado). */
+  /* Mobile-first breakpoints. Base = 320px (minimum supported). */
   --breakpoint-sm: 40rem; /* 640px */
   --breakpoint-md: 48rem; /* 768px */
   --breakpoint-lg: 64rem; /* 1024px */
@@ -38,12 +38,12 @@
 
 :root {
   color-scheme: light;
-  /* Verde: marca y acciones */
+  /* Green: brand and actions */
   --primary: #15803d;
   --primary-hover: #166534;
   --primary-fg: #ffffff;
   --primary-soft: #dcfce7;
-  /* Azul: matiz informativo (en curso, avisos neutros) */
+  /* Blue: informational tint (in progress, neutral notices) */
   --info: #0369a1;
   --info-soft: #e0f2fe;
   --success: #047857;
@@ -52,20 +52,20 @@
   --warning-soft: #fef3c7;
   --danger: #dc2626;
   --danger-soft: #fee2e2;
-  /* Blancos con un toque verde */
+  /* Whites with a hint of green */
   --bg: #f6faf7;
   --surface: #ffffff;
   --fg: #10201a;
   --muted: #edf5ef;
   --muted-fg: #4b5e53;
   --border: #dbe8df;
-  /* Fondo con energía: halos verde/azul + trama de puntos */
+  /* Lively background: green/blue glows + dot pattern */
   --glow-1: rgb(34 197 94 / 0.2);
   --glow-2: rgb(14 165 233 / 0.12);
   --dot: rgb(21 128 61 / 0.09);
 }
 
-/* Tema oscuro: lo activa data-theme="dark" en <html> (ver index.html y lib/theme.ts). */
+/* Dark theme: enabled by data-theme="dark" on <html> (see index.html and lib/theme.ts). */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --primary: #4ade80;

@@ -14,7 +14,7 @@ const renderPage = () =>
   )
 
 describe('RegisterPage', () => {
-  it('valida cada campo y muestra el error debajo de él sin llamar a la API', async () => {
+  it('validates each field and shows the error below it without calling the API', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     renderPage()

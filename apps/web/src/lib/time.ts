@@ -1,16 +1,16 @@
-// Reglas de tiempo del enunciado (sección 4), replicadas en el front para dar feedback inmediato.
-// La validación de verdad está en el backend.
+// Time rules from the brief (section 4), replicated in the frontend for immediate feedback.
+// The authoritative validation lives in the backend.
 
 export const MIN_MINUTES = 15
 export const MAX_MINUTES = 4 * 60
 
-/** "HH:mm" → minutos desde medianoche. */
+/** "HH:mm" → minutes since midnight. */
 export function toMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
 }
 
-/** Fecha y hora actuales en una zona horaria IANA: { date: "YYYY-MM-DD", minutes }. */
+/** Current date and time in an IANA time zone: { date: "YYYY-MM-DD", minutes }. */
 export function nowIn(timeZone: string, now = new Date()) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
@@ -31,7 +31,7 @@ export function nowIn(timeZone: string, now = new Date()) {
   }
 }
 
-/** true si el inicio ya pasó (o es ahora mismo) en la zona de la sala. */
+/** true if the start has already passed (or is right now) in the room's time zone. */
 export function isInPast(date: string, startTime: string, timeZone: string, now = new Date()): boolean {
   const current = nowIn(timeZone, now)
   return date < current.date || (date === current.date && toMinutes(startTime) <= current.minutes)
@@ -43,7 +43,7 @@ export interface SlotInput {
   endTime: string
 }
 
-/** Devuelve el primer error de negocio o null si el horario es válido. */
+/** Returns the first business error, or null if the time slot is valid. */
 export function validateSlot(slot: SlotInput, timeZone: string, now = new Date()): string | null {
   if (!slot.date || !slot.startTime || !slot.endTime) return 'Indica fecha, hora de inicio y hora de fin.'
   const start = toMinutes(slot.startTime)
@@ -58,7 +58,7 @@ export function validateSlot(slot: SlotInput, timeZone: string, now = new Date()
   return null
 }
 
-/** Fecha de hoy (local del navegador) como "YYYY-MM-DD". */
+/** Today's date (browser local time) as "YYYY-MM-DD". */
 export function todayISO(now = new Date()): string {
   return nowIn(Intl.DateTimeFormat().resolvedOptions().timeZone, now).date
 }
@@ -75,13 +75,13 @@ export function formatDate(iso: string, timeZone: string): string {
   )
 }
 
-/** Minutos desde medianoche de un instante, en la zona de la sala. */
+/** Minutes since midnight of an instant, in the room's time zone. */
 export function minutesOfDay(iso: string, timeZone: string): number {
   return nowIn(timeZone, new Date(iso)).minutes
 }
 
 export function formatLongDate(date: string): string {
-  // date "YYYY-MM-DD" → mediodía UTC para evitar saltos de día.
+  // date "YYYY-MM-DD" → noon UTC to avoid day shifts.
   return new Intl.DateTimeFormat('es', {
     timeZone: 'UTC',
     weekday: 'long',

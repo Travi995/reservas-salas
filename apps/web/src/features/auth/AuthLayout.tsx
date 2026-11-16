@@ -12,10 +12,10 @@ const HIGHLIGHTS = [
 ]
 
 /**
- * Layout de login/registro.
- * - Barra superior: logo a la izquierda, tema a la derecha (igual que la app).
- * - ≥ lg: dos columnas, mensaje de marca a la izquierda y formulario a la derecha.
- * - < lg: solo el formulario, compacto, para que quepa sin scroll.
+ * Login/register layout.
+ * - Top bar: logo on the left, theme on the right (same as the app).
+ * - ≥ lg: two columns, brand message on the left and form on the right.
+ * - < lg: only the form, compact, so it fits without scrolling.
  */
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (

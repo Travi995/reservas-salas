@@ -2,5 +2,5 @@ import { SetMetadata } from '@nestjs/common';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 
-/** Marca una ruta como accesible sin token (el AuthGuard es global). */
+/** Marks a route as accessible without a token (the AuthGuard is global). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);

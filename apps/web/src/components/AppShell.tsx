@@ -13,7 +13,7 @@ const NAV = [
   { to: '/admin/salas', label: 'Salas', icon: DoorOpen, admin: true },
 ]
 
-/** Cabecera con navegación en ≥ sm; barra inferior fija en móvil (ADR-0008). */
+/** Header with navigation at ≥ sm; fixed bottom bar on mobile (ADR-0008). */
 export function AppShell() {
   const { user, logout } = useAuth()
   const items = NAV.filter((item) => !item.admin || user?.role === 'admin')
@@ -75,7 +75,7 @@ export function AppShell() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-24 sm:px-6 sm:pb-10">
-        {/* Transición suave al cambiar de página */}
+        {/* Smooth transition when changing pages */}
         <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={ease}>
           <Outlet />
         </motion.div>

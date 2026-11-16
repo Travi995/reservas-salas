@@ -13,7 +13,7 @@ import type { JwtPayload } from './interfaces/jwt-payload.interface.js';
 
 @Injectable()
 export class AuthService {
-  /** Hash de relleno: si el email no existe se verifica igual, para no revelar por tiempo qué emails existen. */
+  /** Dummy hash: if the email does not exist we still verify against it, so timing does not reveal which emails exist. */
   private readonly dummyHash = hash('timing-attack-dummy');
 
   constructor(
@@ -21,7 +21,7 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  /** El registro público siempre crea `member`: el rol nunca viene del body (ADR-0005). */
+  /** Public registration always creates a `member`: the role never comes from the body (ADR-0005). */
   async register(dto: RegisterDto): Promise<AuthResponse> {
     const user = await this.users.create({
       name: dto.name,
@@ -39,7 +39,7 @@ export class AuthService {
       dto.password,
     );
     if (!user || !valid) {
-      // Mismo mensaje para email inexistente y contraseña errónea.
+      // Same message for unknown email and wrong password.
       throw new AppException(
         HttpStatus.UNAUTHORIZED,
         'INVALID_CREDENTIALS',

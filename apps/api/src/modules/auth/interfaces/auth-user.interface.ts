@@ -1,6 +1,6 @@
 import type { Role } from '../../users/enums/role.enum.js';
 
-/** Usuario autenticado que el AuthGuard deja en `request.user`. */
+/** Authenticated user that the AuthGuard puts on `request.user`. */
 export interface AuthUser {
   id: string;
   name: string;

@@ -10,7 +10,7 @@ import type { Role } from '../../users/enums/role.enum.js';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 import type { AuthUser } from '../interfaces/auth-user.interface.js';
 
-/** Guard global que se ejecuta después del AuthGuard: comprueba @Roles(). 403 si el rol no alcanza. */
+/** Global guard that runs after the AuthGuard: checks @Roles(). 403 if the role is insufficient. */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

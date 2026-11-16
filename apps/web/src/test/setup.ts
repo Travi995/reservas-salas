@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
-// jsdom no implementa matchMedia (lo usan el tema y motion).
+// jsdom does not implement matchMedia (used by the theme and motion).
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({

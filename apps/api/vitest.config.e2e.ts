@@ -7,9 +7,9 @@ export default defineConfig({
     root: './',
     include: ['**/*.e2e-spec.ts'],
     globalSetup: ['./test/utils/global-setup.ts'],
-    // BD propia para los tests: nunca toca los datos de desarrollo.
+    // Dedicated DB for the tests: never touches development data.
     env: { DB_NAME: 'reservas_test' },
-    // Los ficheros comparten la BD: en serie para que no se pisen los TRUNCATE.
+    // Test files share the DB: run serially so the TRUNCATEs don't clash.
     fileParallelism: false,
   },
 });

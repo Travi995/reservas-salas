@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#15803D" />
     <script>
-      // Aplica el tema antes de pintar para evitar parpadeo (ADR-0008).
+      // Apply the theme before painting to avoid a flash (ADR-0008).
       try {
         var t = localStorage.getItem('reservas.theme')
         if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'

@@ -8,8 +8,8 @@ import { AppException } from '../exceptions/app.exception.js';
 import { AllExceptionsFilter } from './all-exceptions.filter.js';
 
 function run(exception: unknown) {
-  const json = vi.fn();
-  const status = vi.fn(() => ({ json }));
+  const json = vi.fn((_body: { error: { code: string } }) => undefined);
+  const status = vi.fn((_code: number) => ({ json }));
   const host = {
     switchToHttp: () => ({ getResponse: () => ({ status }) }),
   } as unknown as ArgumentsHost;
@@ -18,7 +18,7 @@ function run(exception: unknown) {
 }
 
 describe('AllExceptionsFilter', () => {
-  it('respeta el código y mensaje de una AppException', () => {
+  it('keeps the code and message of an AppException', () => {
     const res = run(
       new AppException(
         HttpStatus.CONFLICT,
@@ -34,14 +34,14 @@ describe('AllExceptionsFilter', () => {
     });
   });
 
-  it('traduce las excepciones HTTP de Nest al formato único', () => {
+  it('translates Nest HTTP exceptions into the unified format', () => {
     expect(run(new NotFoundException())).toEqual({
       status: 404,
       body: { error: { code: 'NOT_FOUND', message: 'El recurso no existe.' } },
     });
   });
 
-  it('un error inesperado es 500 sin filtrar detalles internos', () => {
+  it('an unexpected error is a 500 without leaking internal details', () => {
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const res = run(new Error('connection string with password=secret'));
     expect(res.status).toBe(500);

@@ -17,7 +17,7 @@ export interface FieldError {
   message: string
 }
 
-/** Error de la API con el formato único `{ error: { code, message, details? } }`. */
+/** API error with the unified format `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
@@ -39,7 +39,7 @@ export const tokenStore = {
 }
 
 let onUnauthorized: () => void = () => {}
-/** El AuthProvider registra aquí qué hacer ante un 401 (cerrar sesión). */
+/** The AuthProvider registers here what to do on a 401 (log out). */
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
 }
@@ -78,7 +78,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
   if (!res.ok) {
     const error = await parseError(res)
-    // 401 en una ruta protegida = sesión caducada. En login es «credenciales incorrectas».
+    // 401 on a protected route = expired session. On login it means "invalid credentials".
     if (res.status === 401 && token) onUnauthorized()
     throw error
   }

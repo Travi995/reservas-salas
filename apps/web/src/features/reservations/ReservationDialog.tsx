@@ -17,7 +17,7 @@ interface ReservationDialogProps {
 export function ReservationDialog({ open, rooms, initial, onClose, onCreated }: ReservationDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} title="Nueva reserva">
-      {/* key: resetea el formulario cada vez que se abre con otra sala/fecha */}
+      {/* key: resets the form each time it opens with a different room/date */}
       <ReservationForm
         key={`${initial.roomId}-${initial.date}-${open}`}
         rooms={rooms}
@@ -87,7 +87,7 @@ function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<Reservatio
           {...register('startTime', {
             required: rules.required('Indica la hora de inicio.'),
             deps: ['endTime'],
-            // «No se puede reservar en el pasado» va en el campo de inicio.
+            // «No se puede reservar en el pasado» goes on the start field.
             validate: (startTime) => {
               const { date, roomId } = getValues()
               const room = roomOf(roomId)
@@ -102,7 +102,7 @@ function ReservationForm({ rooms, initial, onClose, onCreated }: Omit<Reservatio
           error={errors.endTime?.message}
           {...register('endTime', {
             required: rules.required('Indica la hora de fin.'),
-            // Fin > inicio y duración entre 15 min y 4 h van en el campo de fin.
+            // End > start and duration between 15 min and 4 h go on the end field.
             validate: (endTime) => {
               const { startTime } = getValues()
               if (!startTime) return true

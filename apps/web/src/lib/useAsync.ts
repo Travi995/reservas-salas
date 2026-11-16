@@ -7,7 +7,7 @@ interface AsyncState<T> {
   loading: boolean
 }
 
-/** Carga datos y re-carga cuando cambian las dependencias. Mínimo a propósito (ADR-0007). */
+/** Loads data and reloads it when the dependencies change. Deliberately minimal (ADR-0007). */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [state, setState] = useState<AsyncState<T>>({ data: null, error: null, loading: true })
   const [version, setVersion] = useState(0)

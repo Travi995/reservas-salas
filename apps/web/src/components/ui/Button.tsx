@@ -12,7 +12,7 @@ const VARIANTS: Record<Variant, string> = {
   danger: 'border border-border bg-surface text-danger hover:bg-danger-soft',
 }
 
-// md = 44px (objetivo táctil mínimo). sm = 36px, solo para acciones secundarias en filas densas.
+// md = 44px (minimum touch target). sm = 36px, only for secondary actions in dense rows.
 const SIZES: Record<Size, string> = {
   md: 'h-11 px-4 text-sm',
   sm: 'h-9 px-3 text-sm',

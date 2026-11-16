@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react'
 export type Theme = 'light' | 'dark'
 const KEY = 'reservas.theme'
 
-// Store único del tema: lo comparten el botón sol/luna y el Toaster.
+// Single theme store: shared by the sun/moon button and the Toaster.
 const listeners = new Set<() => void>()
 const media = () => matchMedia('(prefers-color-scheme: dark)')
 
@@ -25,7 +25,7 @@ function apply(theme: Theme) {
 
 function subscribe(listener: () => void) {
   listeners.add(listener)
-  // Sin elección guardada, seguir los cambios del sistema.
+  // With no saved choice, follow system changes.
   const onSystem = () => stored() === null && apply(media().matches ? 'dark' : 'light')
   const mq = media()
   mq.addEventListener('change', onSystem)
@@ -40,12 +40,12 @@ function toggle() {
   try {
     localStorage.setItem(KEY, next)
   } catch {
-    /* sin almacenamiento: el cambio dura la sesión */
+    /* no storage: the change lasts for the session */
   }
   apply(next)
 }
 
-/** Tema claro/oscuro. El valor inicial lo pone el script inline de index.html. */
+/** Light/dark theme. The initial value is set by the inline script in index.html. */
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, current, () => 'light' as Theme)
   return { theme, toggle }

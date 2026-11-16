@@ -6,7 +6,7 @@ import {
 import { AppException } from '../exceptions/app.exception.js';
 import type { FieldError } from '../interfaces/api-error.interface.js';
 
-/** Aplana los errores de class-validator (incluidos anidados) a `{ field, message }`, uno por campo. */
+/** Flattens class-validator errors (including nested ones) into `{ field, message }`, one per field. */
 function flatten(errors: ValidationError[], parent = ''): FieldError[] {
   return errors.flatMap((e) => {
     const field = parent ? `${parent}.${e.property}` : e.property;
@@ -17,7 +17,7 @@ function flatten(errors: ValidationError[], parent = ''): FieldError[] {
   });
 }
 
-/** ValidationPipe global: whitelist estricta y 400 VALIDATION_ERROR con el detalle por campo. */
+/** Global ValidationPipe: strict whitelist and 400 VALIDATION_ERROR with per-field details. */
 export function createValidationPipe() {
   return new ValidationPipe({
     whitelist: true,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/** Hora actual que se refresca cada minuto (para «ya empezó», «en curso»…). */
+/** Current time, refreshed every minute (for "already started", "in progress"…). */
 export function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {

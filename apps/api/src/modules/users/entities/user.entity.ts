@@ -14,11 +14,11 @@ export class User {
   @Column({ length: 80 })
   name: string;
 
-  /** Siempre en minúsculas (lo normaliza el servicio); único en BD. */
+  /** Always lowercase (normalized by the service); unique in the DB. */
   @Column({ length: 254, unique: true })
   email: string;
 
-  /** Hash argon2id. Nunca se serializa en las respuestas. */
+  /** argon2id hash. Never serialized in responses. */
   @Column({ name: 'password_hash', select: false })
   passwordHash: string;
 

@@ -1,4 +1,4 @@
-// Tipos del contrato de API (ADR-0009).
+// API contract types (ADR-0009).
 export type Role = 'admin' | 'member'
 
 export interface User {

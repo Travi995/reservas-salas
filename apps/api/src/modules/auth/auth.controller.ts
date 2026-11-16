@@ -19,14 +19,14 @@ import type { AuthUser } from './interfaces/auth-user.interface.js';
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  /** 201 · 400 validación · 409 email ya registrado. */
+  /** 201 · 400 validation · 409 email already registered. */
   @Public()
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
 
-  /** 200 · 400 validación · 401 credenciales incorrectas. No crea recurso, por eso 200 y no 201. */
+  /** 200 · 400 validation · 401 invalid credentials. Creates no resource, hence 200 and not 201. */
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -34,7 +34,7 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
-  /** 200 · 401 sin token o token inválido. */
+  /** 200 · 401 missing or invalid token. */
   @ApiBearerAuth()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {

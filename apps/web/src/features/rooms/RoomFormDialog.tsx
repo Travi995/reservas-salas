@@ -6,7 +6,7 @@ import type { Room } from '../../lib/types'
 
 interface RoomFormDialogProps {
   open: boolean
-  room: Room | null // null = crear
+  room: Room | null // null = create
   onClose: () => void
   onSaved: (room: Room) => void
 }

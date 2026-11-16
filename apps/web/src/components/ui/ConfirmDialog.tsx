@@ -13,7 +13,7 @@ interface ConfirmDialogProps {
   onClose: () => void
 }
 
-/** Confirmación para acciones irreversibles. Si la API falla, toast de error y el diálogo sigue abierto. */
+/** Confirmation for irreversible actions. If the API fails, an error toast is shown and the dialog stays open. */
 export function ConfirmDialog({
   open,
   title,

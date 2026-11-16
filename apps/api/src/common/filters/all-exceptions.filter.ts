@@ -10,7 +10,7 @@ import type { Response } from 'express';
 import type { ApiErrorBody } from '../interfaces/api-error.interface.js';
 import { AppException } from '../exceptions/app.exception.js';
 
-/** Código y mensaje por defecto para las excepciones HTTP de Nest/Express que no son AppException. */
+/** Default code and message for Nest/Express HTTP exceptions that are not AppException. */
 const DEFAULTS: Partial<Record<number, { code: string; message: string }>> = {
   400: { code: 'BAD_REQUEST', message: 'La petición no es válida.' },
   401: { code: 'UNAUTHORIZED', message: 'Necesitas iniciar sesión.' },
@@ -40,8 +40,8 @@ const DEFAULTS: Partial<Record<number, { code: string; message: string }>> = {
 };
 
 /**
- * Convierte cualquier error en el formato único `{ error: { code, message, details? } }`.
- * Los errores inesperados devuelven 500 sin filtrar detalles internos y se registran en el log.
+ * Converts any error into the unified format `{ error: { code, message, details? } }`.
+ * Unexpected errors return 500 without leaking internal details and are logged.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {

@@ -7,8 +7,8 @@ const BLOBS = [
 ]
 
 /**
- * Fondo estándar de todo el sitio: halos verde/azul que se desplazan despacio
- * sobre la trama de puntos del body. Fijo detrás del contenido, sin interacción.
+ * Site-wide standard background: green/blue glows drifting slowly
+ * over the body's dot pattern. Fixed behind the content, non-interactive.
  */
 export function AnimatedBackground() {
   return (

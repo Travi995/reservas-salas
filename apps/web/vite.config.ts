@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    // En desarrollo, /api va al backend Nest: sin CORS.
+    // In development, /api goes to the Nest backend: no CORS.
     proxy: { '/api': 'http://localhost:3000' },
   },
   test: {

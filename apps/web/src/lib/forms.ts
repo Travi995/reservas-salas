@@ -3,9 +3,9 @@ import { ApiError } from './api'
 import { notify } from './notify'
 
 /**
- * Aplica un error de la API a un formulario de react-hook-form:
- * - errores de campo (400 con `details`) → debajo de su campo;
- * - el resto (401, 404, 409, 422, red…) → toast global.
+ * Applies an API error to a react-hook-form form:
+ * - field errors (400 with `details`) → below their field;
+ * - everything else (401, 404, 409, 422, network…) → global toast.
  */
 export function applyApiError<T extends FieldValues>(
   error: unknown,
@@ -19,7 +19,7 @@ export function applyApiError<T extends FieldValues>(
   if (details.length === 0) notify.error(error)
 }
 
-/** Reglas comunes. Cada campo pasa su mensaje completo («Indica la fecha.») para que concuerde en género. */
+/** Shared rules. Each field passes its full message («Indica la fecha.») so that it agrees in grammatical gender. */
 export const rules = {
   required: (message: string) => ({ value: true, message }),
   email: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Introduce un email válido.' },
