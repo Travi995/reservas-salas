@@ -123,6 +123,41 @@ describe('Reservations (e2e)', () => {
       expect(await ctx.db.getRepository(Reservation).count()).toBe(1);
     });
 
+    it('concurrency: partially overlapping simultaneous requests never end in a 500', async () => {
+      // 20 one-hour slots starting every 20 minutes: each one overlaps its neighbours.
+      // Without serializing the bookings of a room, Postgres aborts some of them with a deadlock.
+      const users = await Promise.all(
+        Array.from({ length: 20 }, (_, i) =>
+          loginAs(ctx, `racer${i}@demo.com`),
+        ),
+      );
+      const hhmm = (m: number) =>
+        `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const results = await Promise.all(
+        users.map(({ token }, i) =>
+          book(token, {
+            startTime: hhmm(8 * 60 + i * 20),
+            endTime: hhmm(9 * 60 + i * 20),
+          }),
+        ),
+      );
+      expect(results.filter((r) => ![201, 409].includes(r.status))).toEqual([]);
+      for (const r of results.filter((r) => r.status === 409)) {
+        expect(r.body.error.code).toBe('ROOM_OVERLAP');
+      }
+      const saved = await ctx.db
+        .getRepository(Reservation)
+        .find({ order: { startsAt: 'ASC' } });
+      expect(saved.length).toBe(results.filter((r) => r.status === 201).length);
+      for (let i = 1; i < saved.length; i++) {
+        expect(saved[i].startsAt >= saved[i - 1].endsAt).toBe(true);
+      }
+    });
+
+    it('400: dates outside the supported range (year 9999)', async () => {
+      await book(ana.token, { date: '9999-12-31' }).expect(400);
+    });
+
     describe('422 business rules', () => {
       it('end must be after start', async () => {
         const res = await book(ana.token, {
@@ -254,6 +289,8 @@ describe('Reservations (e2e)', () => {
         pageSize: 10,
         totalItems: 4,
         totalPages: 1,
+        // The cancelled one is listed but not counted as an upcoming reservation.
+        activeItems: 3,
       });
 
       const past = await mine('?scope=past');
@@ -267,6 +304,7 @@ describe('Reservations (e2e)', () => {
         pageSize: 3,
         totalItems: 4,
         totalPages: 2,
+        activeItems: 3,
       });
     });
 
@@ -432,6 +470,33 @@ describe('Reservations (e2e)', () => {
 
     it("200: an admin can cancel anyone's reservation", async () => {
       await cancel(admin).expect(200);
+    });
+
+    it('records who cancelled: the owner sees that an admin did it', async () => {
+      const res = await cancel(admin).expect(200);
+      expect(res.body.cancelledBy).toMatchObject({ name: 'admin' });
+
+      const mine = await http()
+        .get('/api/v1/reservations/me')
+        .set(auth(ana.token))
+        .expect(200);
+      expect(mine.body.items[0]).toMatchObject({
+        status: 'cancelled',
+        cancelledBy: { id: expect.any(String), name: 'admin' },
+      });
+      // Cancelled reservations stay in the list but are not counted as upcoming.
+      expect(mine.body.meta).toMatchObject({ totalItems: 1, activeItems: 0 });
+    });
+
+    it('cancelledBy is the owner when they cancel, and null while active', async () => {
+      const active = await http()
+        .get('/api/v1/reservations/me')
+        .set(auth(ana.token));
+      expect(active.body.items[0].cancelledBy).toBeNull();
+      expect(active.body.meta.activeItems).toBe(1);
+
+      const res = await cancel(ana.token).expect(200);
+      expect(res.body.cancelledBy).toEqual({ id: ana.id, name: 'ana' });
     });
 
     it('409: already cancelled', async () => {

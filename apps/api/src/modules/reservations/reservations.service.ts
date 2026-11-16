@@ -5,11 +5,11 @@ import {
   Brackets,
   DataSource,
   EntityManager,
-  QueryFailedError,
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
 import { Clock } from '../../common/clock/clock.js';
+import { isPgError, PG } from '../../common/database/pg-errors.js';
 import { paginate, type Paginated } from '../../common/pagination/paginated.js';
 import { AppException } from '../../common/exceptions/app.exception.js';
 import { formatTime, zonedToUtc } from '../../common/time/zoned-time.js';
@@ -27,6 +27,7 @@ import { Reservation } from './entities/reservation.entity.js';
 import { ReservationStatus } from './enums/reservation-status.enum.js';
 import type {
   AdminReservationResponse,
+  MyReservationsPage,
   RecurringReservationResponse,
   ReservationResponse,
 } from './interfaces/reservation-response.interface.js';
@@ -40,7 +41,8 @@ interface Slot {
   endsAt: Date;
 }
 
-const EXCLUSION_VIOLATION = '23P01';
+/** Lost a race against another booking of the same room: both are answered as a 409, never a 500. */
+const LOST_RACE = [PG.EXCLUSION_VIOLATION, PG.DEADLOCK_DETECTED];
 
 @Injectable()
 export class ReservationsService {
@@ -54,7 +56,8 @@ export class ReservationsService {
   /**
    * Creates a reservation. Order of checks = order of status codes:
    * 404 room → 422 inactive room → 422 time rules → 409 overlap.
-   * The pre-check gives a clear message; the EXCLUDE constraint is the real guarantee under concurrency (ADR-0003).
+   * Bookings of one room run one at a time (advisory lock), so the pre-check sees the winner and names its slot;
+   * the EXCLUDE constraint stays as the final guarantee (ADR-0003).
    */
   async create(
     dto: CreateReservationDto,
@@ -92,10 +95,7 @@ export class ReservationsService {
       });
     } catch (e) {
       // Lost the race: another request inserted an overlapping reservation after our pre-check.
-      if (
-        e instanceof QueryFailedError &&
-        (e.driverError as { code?: string }).code === EXCLUSION_VIOLATION
-      ) {
+      if (isPgError(e, ...LOST_RACE)) {
         throw await this.overlapErrorAfterRace(dto, user.id);
       }
       throw e;
@@ -152,10 +152,7 @@ export class ReservationsService {
         };
       });
     } catch (e) {
-      if (
-        e instanceof QueryFailedError &&
-        (e.driverError as { code?: string }).code === EXCLUSION_VIOLATION
-      ) {
+      if (isPgError(e, ...LOST_RACE)) {
         // Lost a race on one of the dates: recompute the conflicts outside the rolled-back transaction.
         const room = await this.dataSource
           .getRepository(Room)
@@ -175,13 +172,23 @@ export class ReservationsService {
   async findMine(
     userId: string,
     query: MyReservationsQueryDto,
-  ): Promise<Paginated<ReservationResponse>> {
+  ): Promise<MyReservationsPage> {
     const qb = this.reservations
       .createQueryBuilder('r')
       .innerJoinAndSelect('r.room', 'room')
+      .leftJoin('r.cancelledBy', 'canceller')
+      .addSelect(['canceller.id', 'canceller.name'])
       .where('r.user_id = :userId', { userId });
     this.applyScope(qb, query.scope);
-    return this.page(qb, query.page, query.pageSize, (r) => this.toResponse(r));
+    // The list keeps cancelled reservations (marked as such); the tab counter must not count them.
+    const activeItems = await qb
+      .clone()
+      .andWhere('r.status = :active', { active: ReservationStatus.Active })
+      .getCount();
+    const page = await this.page(qb, query.page, query.pageSize, (r) =>
+      this.toResponse(r),
+    );
+    return { ...page, meta: { ...page.meta, activeItems } };
   }
 
   /** Admin listing of every reservation, filtered, searched and paginated in the database. */
@@ -192,7 +199,9 @@ export class ReservationsService {
       .createQueryBuilder('r')
       .innerJoinAndSelect('r.room', 'room')
       .innerJoin('r.user', 'user')
-      .addSelect(['user.id', 'user.name', 'user.email']);
+      .addSelect(['user.id', 'user.name', 'user.email'])
+      .leftJoin('r.cancelledBy', 'canceller')
+      .addSelect(['canceller.id', 'canceller.name']);
 
     if (query.status)
       qb.andWhere('r.status = :status', { status: query.status });
@@ -297,7 +306,11 @@ export class ReservationsService {
     const result = await this.reservations
       .createQueryBuilder()
       .update()
-      .set({ status: ReservationStatus.Cancelled, cancelledAt: now })
+      .set({
+        status: ReservationStatus.Cancelled,
+        cancelledAt: now,
+        cancelledById: user.id,
+      })
       .where('id = :id AND status = :active', {
         id,
         active: ReservationStatus.Active,
@@ -310,15 +323,29 @@ export class ReservationsService {
         'La reserva ya estaba cancelada.',
       );
     }
-    return this.toResponse(
-      reservation,
-      reservation.room,
-      ReservationStatus.Cancelled,
-    );
+    return {
+      ...this.toResponse(
+        reservation,
+        reservation.room,
+        ReservationStatus.Cancelled,
+      ),
+      cancelledBy: { id: user.id, name: user.name },
+    };
   }
 
-  /** Locks the room FOR SHARE (a concurrent deactivation waits until we commit). 404 → 422 inactive. */
+  /**
+   * Serializes the bookings of one room and locks its row. 404 → 422 inactive.
+   *
+   * - Advisory lock (per room, released at commit/rollback): without it, two overlapping inserts wait on
+   *   each other inside the EXCLUDE check and Postgres aborts one with a deadlock (a 500 for the user).
+   *   Queued behind the lock, the second request reads the committed winner and gets a precise 409.
+   *   Other rooms, reads and room edits are not blocked.
+   * - Row lock FOR SHARE: a concurrent deactivation or time zone change waits until we commit.
+   */
   private async lockBookableRoom(tx: EntityManager, roomId: string) {
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      roomId,
+    ]);
     const room = await tx.findOne(Room, {
       where: { id: roomId },
       lock: { mode: 'pessimistic_read' },
@@ -467,6 +494,9 @@ export class ReservationsService {
       endsAt: r.endsAt,
       status,
       seriesId: r.seriesId,
+      cancelledBy: r.cancelledBy
+        ? { id: r.cancelledBy.id, name: r.cancelledBy.name }
+        : null,
       room,
     };
   }

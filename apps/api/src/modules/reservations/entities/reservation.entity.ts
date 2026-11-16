@@ -62,6 +62,14 @@ export class Reservation {
   })
   cancelledAt: Date | null;
 
+  @Column({ name: 'cancelled_by', type: 'uuid', nullable: true })
+  cancelledById: string | null;
+
+  /** Who cancelled it: the owner or an admin. Kept as an audit trail and shown to the owner. */
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'cancelled_by' })
+  cancelledBy: User | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz', select: false })
   createdAt: Date;
 }
