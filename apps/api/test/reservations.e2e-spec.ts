@@ -74,6 +74,13 @@ describe('Reservations (e2e)', () => {
         });
       });
 
+      it('409 that says it is your own reservation (e.g. a retry after a lost response)', async () => {
+        const res = await book(ana.token).expect(409);
+        expect(res.body.error.message).toBe(
+          'Ya tienes una reserva en esta sala de 10:00 a 11:00 («Daily»). Revísala en Mis reservas.',
+        );
+      });
+
       it('409 for a slot fully inside or fully containing an existing one', async () => {
         await book(bob.token, { startTime: '10:15', endTime: '10:45' }).expect(
           409,
@@ -225,20 +232,181 @@ describe('Reservations (e2e)', () => {
         endsAt: new Date(now + 101 * hour),
       });
 
-      const res = await http()
-        .get('/api/v1/reservations/me')
-        .set(auth(ana.token))
-        .expect(200);
-      expect(res.body.upcoming.map((r: { title: string }) => r.title)).toEqual([
+      const mine = (q: string) =>
+        http()
+          .get(`/api/v1/reservations/me${q}`)
+          .set(auth(ana.token))
+          .expect(200);
+      const titles = (body: { items: { title: string }[] }) =>
+        body.items.map((r) => r.title);
+
+      const upcoming = await mine('');
+      // Split by date only: a future cancelled reservation is still "upcoming" (shown as cancelled).
+      expect(titles(upcoming.body)).toEqual([
         'in progress',
         'soon',
         'later',
-      ]);
-      expect(res.body.past.map((r: { title: string }) => r.title)).toEqual([
         'cancelled',
-        'yesterday',
       ]);
-      expect(res.body.upcoming[0].room.name).toBe('Sala Andes');
+      expect(upcoming.body.items[0].room.name).toBe('Sala Andes');
+      expect(upcoming.body.meta).toEqual({
+        page: 1,
+        pageSize: 10,
+        totalItems: 4,
+        totalPages: 1,
+      });
+
+      const past = await mine('?scope=past');
+      expect(titles(past.body)).toEqual(['yesterday']);
+
+      // Pagination happens in the database: page 2 of size 3 holds only the fourth item.
+      const page2 = await mine('?scope=upcoming&page=2&pageSize=3');
+      expect(titles(page2.body)).toEqual(['cancelled']);
+      expect(page2.body.meta).toEqual({
+        page: 2,
+        pageSize: 3,
+        totalItems: 4,
+        totalPages: 2,
+      });
+    });
+
+    it('400 for invalid pagination params', async () => {
+      const res = await http()
+        .get('/api/v1/reservations/me?page=0&pageSize=101&scope=all')
+        .set(auth(ana.token))
+        .expect(400);
+      expect(
+        res.body.error.details.map((d: { field: string }) => d.field).sort(),
+      ).toEqual(['page', 'pageSize', 'scope']);
+    });
+
+    it('400 (not 500) for a huge page and a type message for non-numbers', async () => {
+      const huge = await http()
+        .get('/api/v1/reservations/me?page=9999999999999999999&pageSize=100')
+        .set(auth(ana.token))
+        .expect(400);
+      expect(huge.body.error.details).toEqual([
+        { field: 'page', message: 'La página no puede superar 100000.' },
+      ]);
+      const abc = await http()
+        .get('/api/v1/reservations/me?pageSize=abc&foo=1')
+        .set(auth(ana.token))
+        .expect(400);
+      expect(abc.body.error.details).toEqual(
+        expect.arrayContaining([
+          {
+            field: 'pageSize',
+            message: 'El tamaño de página debe ser un número entero.',
+          },
+          { field: 'foo', message: 'Este campo no está permitido.' },
+        ]),
+      );
+    });
+  });
+
+  describe('GET /api/reservations (admin)', () => {
+    beforeEach(async () => {
+      const other = await createRoom(ctx.db, { name: 'Sala Pampa' });
+      await book(ana.token, {
+        title: 'Daily ana',
+        startTime: '09:00',
+        endTime: '10:00',
+      }).expect(201);
+      await book(bob.token, {
+        title: 'Retro',
+        startTime: '10:00',
+        endTime: '11:00',
+      }).expect(201);
+      await book(bob.token, { title: 'Planning', roomId: other.id }).expect(
+        201,
+      );
+      const cancelled = await book(ana.token, {
+        title: '50% off',
+        startTime: '12:00',
+        endTime: '13:00',
+      }).expect(201);
+      await http()
+        .post(`/api/v1/reservations/${cancelled.body.id}/cancel`)
+        .set(auth(ana.token))
+        .expect(200);
+    });
+    const list = (q = '', token = admin) =>
+      http().get(`/api/v1/reservations${q}`).set(auth(token));
+
+    it('403 for members', async () => {
+      await list('', ana.token).expect(403);
+    });
+
+    it("200: every user's reservations, paginated, with who booked them", async () => {
+      const res = await list('?pageSize=3').expect(200);
+      expect(res.body.meta).toEqual({
+        page: 1,
+        pageSize: 3,
+        totalItems: 4,
+        totalPages: 2,
+      });
+      expect(res.body.items).toHaveLength(3);
+      expect(res.body.items[0].user).toEqual({
+        id: expect.any(String),
+        name: expect.any(String),
+        email: expect.any(String),
+      });
+      const next = await list('?pageSize=3&page=2').expect(200);
+      expect(next.body.items).toHaveLength(1);
+    });
+
+    it('searches by title, room, user name or email (case-insensitive)', async () => {
+      const titles = async (q: string) =>
+        (await list(q).expect(200)).body.items
+          .map((r: { title: string }) => r.title)
+          .sort();
+      expect(await titles('?search=RETRO')).toEqual(['Retro']);
+      expect(await titles('?search=pampa')).toEqual(['Planning']);
+      expect(await titles('?search=bob@demo')).toEqual(['Planning', 'Retro']);
+      // "%" is matched literally, not as a wildcard.
+      expect(await titles('?search=50%25')).toEqual(['50% off']);
+    });
+
+    it('ignores accents in the search', async () => {
+      await book(ana.token, {
+        title: 'Reunión con Ñúñez',
+        startTime: '15:00',
+        endTime: '16:00',
+      }).expect(201);
+      const titles = async (q: string) =>
+        (await list(q).expect(200)).body.items.map(
+          (r: { title: string }) => r.title,
+        );
+      expect(await titles('?search=reunion')).toEqual(['Reunión con Ñúñez']);
+      expect(await titles('?search=NUNEZ')).toEqual(['Reunión con Ñúñez']);
+    });
+
+    it('400 (not 500) for a NUL byte in the search', async () => {
+      const res = await list('?search=a%00b').expect(400);
+      expect(res.body.error.details).toEqual([
+        {
+          field: 'search',
+          message: 'El texto contiene caracteres no válidos.',
+        },
+      ]);
+    });
+
+    it('filters by status and room', async () => {
+      const cancelled = await list('?status=cancelled').expect(200);
+      expect(
+        cancelled.body.items.map((r: { title: string }) => r.title),
+      ).toEqual(['50% off']);
+      const inRoom = await list(`?roomId=${room.id}&status=active`).expect(200);
+      expect(inRoom.body.meta.totalItems).toBe(2);
+      // The date scope does not depend on the status: future cancelled ones are "upcoming".
+      const cancelledUpcoming = await list(
+        '?status=cancelled&scope=upcoming',
+      ).expect(200);
+      expect(cancelledUpcoming.body.meta.totalItems).toBe(1);
+      const cancelledPast = await list('?status=cancelled&scope=past').expect(
+        200,
+      );
+      expect(cancelledPast.body.meta.totalItems).toBe(0);
     });
   });
 

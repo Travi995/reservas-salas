@@ -7,10 +7,18 @@ export interface ReservationResponse {
   startsAt: Date;
   endsAt: Date;
   status: ReservationStatus;
+  /** Set when the reservation is one occurrence of a recurring series. */
+  seriesId: string | null;
   room: Room;
 }
 
-export interface MyReservationsResponse {
-  upcoming: ReservationResponse[];
-  past: ReservationResponse[];
+/** 201 of POST /reservations/recurring: every occurrence, soonest first. */
+export interface RecurringReservationResponse {
+  seriesId: string;
+  reservations: ReservationResponse[];
+}
+
+/** Admin listing row: the reservation plus who booked it. */
+export interface AdminReservationResponse extends ReservationResponse {
+  user: { id: string; name: string; email: string };
 }

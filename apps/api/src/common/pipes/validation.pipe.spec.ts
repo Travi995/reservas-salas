@@ -50,4 +50,28 @@ describe('createValidationPipe', () => {
       error: { details: [{ field: 'role' }] },
     });
   });
+
+  it('says "not allowed" in Spanish for undeclared properties', async () => {
+    const error = (await validate({
+      capacity: 2,
+      child: { value: 1 },
+      role: 'admin',
+    }).catch((e: unknown) => e)) as AppException;
+    expect(error.getResponse()).toMatchObject({
+      error: {
+        details: [{ field: 'role', message: 'Este campo no está permitido.' }],
+      },
+    });
+  });
+
+  it('rejects NUL bytes with a 400 instead of letting Postgres fail with a 500', async () => {
+    const error = (await validate({
+      capacity: 2,
+      child: { value: 1, name: 'a\u0000b' },
+    }).catch((e: unknown) => e)) as AppException;
+    expect(error.getStatus()).toBe(400);
+    expect(error.getResponse()).toMatchObject({
+      error: { details: [{ field: 'child.name' }] },
+    });
+  });
 });
