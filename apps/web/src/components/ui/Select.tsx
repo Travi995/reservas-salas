@@ -23,6 +23,10 @@ export interface SelectProps {
   disabled?: boolean
   placeholder?: string
   className?: string
+  /** Option highlighted (and scrolled to) when opening with nothing selected, e.g. 09:00 in a long list of times. */
+  initialValue?: string
+  /** Compact variant: label to the left of a small trigger (e.g. «Por página» in a pagination bar). */
+  inline?: boolean
   /** Forwarded to the trigger button (react-hook-form `field.ref`, so `shouldFocus` works). */
   ref?: Ref<HTMLButtonElement>
 }
@@ -48,6 +52,8 @@ export function Select({
   disabled,
   placeholder = 'Selecciona una opción',
   className,
+  inline,
+  initialValue,
   ref,
 }: SelectProps) {
   const id = useId()
@@ -59,6 +65,9 @@ export function Select({
   const rootRef = useRef<HTMLDivElement>(null)
   const [triggerRef, setTriggerRef] = useTriggerRef(ref)
   const typeahead = useRef({ text: '', timer: 0 })
+  const listRef = useRef<HTMLUListElement>(null)
+  /** The first scroll after opening centres the active option; later ones (keyboard) only keep it in view. */
+  const justOpened = useRef(false)
 
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -72,6 +81,7 @@ export function Select({
   const openList = (index: number) => {
     if (disabled || options.length === 0) return
     setActive(Math.max(0, Math.min(index, options.length - 1)))
+    justOpened.current = true
     setUp(shouldOpenUp(triggerRef.current, LIST_MAX_HEIGHT))
     setOpen(true)
   }
@@ -94,9 +104,24 @@ export function Select({
   }
 
   // Keeps the active option visible while navigating a long list.
+  // Scrolls the list itself (never an ancestor: scrollIntoView would also scroll the dialog around it).
   useEffect(() => {
-    if (open) document.getElementById(`${id}-opt-${active}`)?.scrollIntoView?.({ block: 'nearest' })
+    const list = listRef.current
+    const option = open ? document.getElementById(`${id}-opt-${active}`) : null
+    if (!list || !option) return
+    const top = option.offsetTop
+    const bottom = top + option.offsetHeight
+    if (justOpened.current) {
+      list.scrollTop = top - (list.clientHeight - option.offsetHeight) / 2
+      justOpened.current = false
+    } else if (top < list.scrollTop) list.scrollTop = top
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight
   }, [open, active, id])
+
+  const initialIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === initialValue),
+  )
 
   useEffect(() => () => window.clearTimeout(typeahead.current.timer), [])
 
@@ -125,7 +150,7 @@ export function Select({
     if (!open) {
       if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(key)) {
         event.preventDefault()
-        openList(selectedIndex >= 0 ? selectedIndex : 0)
+        openList(selectedIndex >= 0 ? selectedIndex : initialIndex)
       } else if (key === 'Home' || key === 'End') {
         event.preventDefault()
         openList(key === 'Home' ? 0 : last)
@@ -179,11 +204,15 @@ export function Select({
   }
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      <span id={labelId} className="text-sm font-medium text-fg" onClick={() => triggerRef.current?.focus()}>
+    <div className={cn('flex min-w-0 gap-1.5', inline ? 'items-center gap-2' : 'flex-col', className)}>
+      <span
+        id={labelId}
+        className={cn('text-sm', inline ? 'whitespace-nowrap text-muted-fg' : 'font-medium text-fg')}
+        onClick={() => triggerRef.current?.focus()}
+      >
         {label}
       </span>
-      <div ref={rootRef} className="relative min-w-0">
+      <div ref={rootRef} className={cn('relative min-w-0', inline && 'w-20')}>
         <button
           ref={setTriggerRef}
           type="button"
@@ -196,14 +225,17 @@ export function Select({
           aria-activedescendant={open ? optionId(active) : undefined}
           aria-invalid={invalid || undefined}
           aria-describedby={message ? msgId : undefined}
-          onClick={() => (open ? close() : openList(selectedIndex >= 0 ? selectedIndex : 0))}
+          onClick={() => (open ? close() : openList(selectedIndex >= 0 ? selectedIndex : initialIndex))}
           onKeyDown={onKeyDown}
           onBlur={(e) => {
             if (rootRef.current?.contains(e.relatedTarget)) return
             setOpen(false)
             onBlur?.()
           }}
-          className={cn(TRIGGER, invalid ? 'border-danger' : 'border-control')}
+          className={cn(
+            inline ? TRIGGER.replace('h-11', 'h-9').replace('px-3', 'px-2.5').replace('text-base', 'text-sm') : TRIGGER,
+            invalid ? 'border-danger' : 'border-control',
+          )}
         >
           <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-muted-fg')}>
             {selected?.label ?? placeholder}
@@ -218,6 +250,7 @@ export function Select({
         <AnimatePresence>
           {open && (
             <motion.ul
+              ref={listRef}
               id={listId}
               role="listbox"
               aria-labelledby={labelId}
@@ -245,7 +278,8 @@ export function Select({
                     onClick={() => choose(index)}
                     onMouseMove={() => index !== active && setActive(index)}
                     className={cn(
-                      'flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-base',
+                      'flex cursor-pointer items-center gap-2 rounded-md px-3 py-2',
+                      inline ? 'min-h-9 text-sm' : 'min-h-11 text-base',
                       index === active && 'bg-muted',
                       isSelected && 'font-medium text-primary',
                     )}

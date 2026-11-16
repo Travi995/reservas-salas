@@ -54,6 +54,45 @@ interface ReservationFormValues extends ReservationInput {
   weeks: number
 }
 
+const STEP = 15
+const DAY_END = 24 * 60
+/** Where a long list of times opens when nothing is chosen yet: a typical start of the working day. */
+const DEFAULT_START = '09:00'
+
+/** Times of the day every 15 minutes, 00:00 to 23:45. */
+const ALL_TIMES = Array.from({ length: DAY_END / STEP }, (_, i) => fromMinutes(i * STEP))
+
+function durationLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
+/** Start options: every quarter hour. A value outside the grid (e.g. typed by an older flow) is kept so it still shows. */
+function startOptions(current: string) {
+  const times = current && !ALL_TIMES.includes(current) ? [...ALL_TIMES, current].sort() : ALL_TIMES
+  return times.map((t) => ({ value: t, label: t }))
+}
+
+/**
+ * End options: once the start is chosen, only the times that make a valid booking (15 min to 4 h later, same day),
+ * each with its duration. The current value is kept even if it fell out of range, so the field never goes blank
+ * while its error explains what to fix.
+ */
+function endOptions(start: string, current: string) {
+  let times = ALL_TIMES
+  if (start) {
+    const from = toMinutes(start)
+    times = ALL_TIMES.filter((t) => toMinutes(t) >= from + MIN_MINUTES && toMinutes(t) <= from + MAX_MINUTES)
+  }
+  if (current && !times.includes(current)) times = [...times, current].sort()
+  return times.map((t) => ({
+    value: t,
+    label: t,
+    description: start && toMinutes(t) > toMinutes(start) ? durationLabel(toMinutes(t) - toMinutes(start)) : undefined,
+  }))
+}
+
 const FIELDS = ['roomId', 'date', 'startTime', 'endTime', 'title', 'weeks'] as const
 
 function ReservationForm({
@@ -85,7 +124,10 @@ function ReservationForm({
 
   // Server errors that belong to no field (overlap, network…) are shown inside the dialog.
   const [formError, setFormError] = useState<string | null>(null)
-  const [repeat, weeks, date, roomId] = useWatch({ control, name: ['repeat', 'weeks', 'date', 'roomId'] })
+  const [repeat, weeks, date, roomId, startTime, endTime] = useWatch({
+    control,
+    name: ['repeat', 'weeks', 'date', 'roomId', 'startTime', 'endTime'],
+  })
   const validWeeks = Number.isInteger(weeks) && weeks >= MIN_WEEKS && weeks <= MAX_WEEKS
   const seriesDates = repeat && date && validWeeks ? weeklyDates(date, weeks) : []
 
@@ -137,34 +179,43 @@ function ReservationForm({
         )}
       />
       <div className="grid grid-cols-2 gap-3">
-        <InputField
-          label="Inicio"
-          type="time"
-          step={900}
-          error={errors.startTime?.message}
-          {...register('startTime', {
+        <Controller
+          control={control}
+          name="startTime"
+          rules={{
             required: rules.required('Indica la hora de inicio.'),
             deps: ['endTime'],
-            // Picking a start proposes a one-hour meeting, so the end rarely has to be typed.
-            onChange: (e: { target: { value: string } }) => {
-              const start = e.target.value
-              if (!start || getValues('endTime')) return
-              setValue('endTime', fromMinutes(Math.min(toMinutes(start) + 60, 23 * 60 + 45)), { shouldValidate: true })
-            },
             // «No se puede reservar en el pasado» goes on the start field.
             validate: (startTime) => {
               const { date, roomId } = getValues()
               const room = roomOf(roomId)
               return !room || !date || !isInPast(date, startTime, room.timezone) || 'No se puede reservar en el pasado.'
             },
-          })}
+          }}
+          render={({ field, fieldState }) => (
+            <Select
+              label="Inicio"
+              placeholder="Elige hora"
+              initialValue={DEFAULT_START}
+              options={startOptions(startTime)}
+              error={fieldState.error?.message}
+              {...field}
+              onChange={(start) => {
+                field.onChange(start)
+                // Picking a start proposes a one-hour meeting, so the end rarely has to be chosen.
+                if (start && !getValues('endTime')) {
+                  setValue('endTime', fromMinutes(Math.min(toMinutes(start) + 60, DAY_END - STEP)), {
+                    shouldValidate: true,
+                  })
+                }
+              }}
+            />
+          )}
         />
-        <InputField
-          label="Fin"
-          type="time"
-          step={900}
-          error={errors.endTime?.message}
-          {...register('endTime', {
+        <Controller
+          control={control}
+          name="endTime"
+          rules={{
             required: rules.required('Indica la hora de fin.'),
             // End > start and duration between 15 min and 4 h go on the end field.
             validate: (endTime) => {
@@ -176,7 +227,19 @@ function ReservationForm({
               if (duration > MAX_MINUTES) return 'Máximo 4 horas.'
               return true
             },
-          })}
+          }}
+          render={({ field, fieldState }) => (
+            <Select
+              label="Fin"
+              placeholder="Elige hora"
+              initialValue={
+                startTime ? fromMinutes(Math.min(toMinutes(startTime) + 60, DAY_END - STEP)) : DEFAULT_START
+              }
+              options={endOptions(startTime, endTime)}
+              error={fieldState.error?.message}
+              {...field}
+            />
+          )}
         />
       </div>
       <InputField

@@ -85,29 +85,33 @@ export function Dialog({ open, onClose, title, children, closeOnBackdrop = true,
       }}
       onClick={(e) => closeOnBackdrop && e.target === ref.current && requestClose()}
       aria-labelledby="dialog-title"
-      className="m-0 mt-auto max-h-[92svh] w-full max-w-none rounded-t-2xl border border-border bg-surface p-0 text-fg backdrop:bg-black/50 backdrop:backdrop-blur-sm sm:m-auto sm:max-w-lg sm:rounded-2xl"
+      className="m-0 mt-auto max-h-[92svh] w-full max-w-none overflow-hidden rounded-t-2xl border border-border bg-surface p-0 text-fg backdrop:bg-black/50 backdrop:backdrop-blur-sm sm:m-auto sm:max-w-lg sm:rounded-2xl"
     >
       {open && (
+        // The entrance animation moves the scroll container itself, not its content: moving the content
+        // 24 px down made it overflow the dialog for a moment and flashed a scrollbar.
         <motion.div
           initial={{ opacity: 0, y: 24, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={spring}
-          className="flex flex-col gap-4 p-4 sm:p-6"
+          className="max-h-[92svh] overflow-y-auto"
         >
-          <div className="flex items-start justify-between gap-4">
-            <h2 id="dialog-title" className="text-lg font-semibold">
-              {title}
-            </h2>
-            <button
-              type="button"
-              onClick={requestClose}
-              aria-label="Cerrar"
-              className="-m-2 inline-flex size-11 items-center justify-center rounded-lg text-muted-fg hover:bg-muted hover:text-fg"
-            >
-              <X aria-hidden="true" className="size-5" />
-            </button>
+          <div className="flex flex-col gap-4 p-4 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="dialog-title" className="text-lg font-semibold">
+                {title}
+              </h2>
+              <button
+                type="button"
+                onClick={requestClose}
+                aria-label="Cerrar"
+                className="-m-2 inline-flex size-11 items-center justify-center rounded-lg text-muted-fg hover:bg-muted hover:text-fg"
+              >
+                <X aria-hidden="true" className="size-5" />
+              </button>
+            </div>
+            {children}
           </div>
-          {children}
         </motion.div>
       )}
     </dialog>
