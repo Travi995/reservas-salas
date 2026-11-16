@@ -60,6 +60,17 @@ El registro público siempre crea usuarios `member`. Al empezar no hay salas: en
   - Cancelar una reserva propia que no haya empezado. El admin puede cancelar las de cualquiera.
 - **Disponibilidad:** eliges un día y ves, por sala, los horarios ocupados (franja visual y lista), con filtro de capacidad mínima.
 
+### Opcionales implementados
+
+- **Paginación y búsqueda** en el listado de reservas del admin (y paginación en «Mis reservas»).
+- **Zonas horarias:** cada sala tiene su zona IANA; las horas se introducen y se muestran en el horario de la sala.
+- **Reservas recurrentes:** «repetir cada semana» durante 2 a 12 semanas, mismo día y horario. Es **todo o nada**: si alguna fecha choca no se crea ninguna, y el `409` dice qué fechas y con qué franja.
+- **Calendario semanal** (`/calendario`): una sala, de lunes a domingo, en su horario. Pulsas un hueco libre para reservar (con la hora ya rellena) y una reserva tuya para cancelarla. Se navega por semanas, y en móvil la rejilla se desplaza dentro de su tarjeta.
+- **Logs y métricas básicas:**
+  - Una línea de log por petición (método, ruta sin query string, status, duración y usuario) en formato legible o JSON (`LOG_FORMAT=json`).
+  - Cada respuesta lleva un `X-Request-Id` (se reutiliza el del cliente o proxy si es seguro). El mismo id aparece en el log del error 500, así se puede llegar del aviso de un usuario a la traza.
+  - `GET /health` (comprueba la BD) y `GET /metrics` (admin): peticiones por clase de status y latencia media y máxima por ruta.
+
 ## Reglas de negocio (sección 4)
 
 Todas están en el backend. El front repite las de tiempo solo para avisar antes de enviar.
@@ -71,6 +82,7 @@ Todas están en el backend. El front repite las de tiempo solo para avisar antes
 | No reservar en el pasado (empezar «ahora» cuenta como pasado) | `checkTimeRules` con el reloj del servidor | `422 IN_THE_PAST` |
 | Duración entre 15 min y 4 h, ambos incluidos | `checkTimeRules` + `CHECK` en BD | `422 DURATION_OUT_OF_RANGE` |
 | Una sala desactivada no acepta reservas nuevas | Servicio, dentro de la transacción | `422 ROOM_INACTIVE` |
+| Reservas recurrentes: cada ocurrencia cumple todo lo anterior | Mismas comprobaciones por fecha, en una sola transacción | `409 ROOM_OVERLAP` con todas las fechas que chocan; no se crea ninguna |
 | Cancelar solo antes de que empiece (vale también para el admin) | Servicio | `422 ALREADY_STARTED` |
 
 ### ¿Qué pasa si dos personas reservan el mismo horario a la vez?
@@ -122,10 +134,18 @@ Todas las respuestas de error tienen el mismo formato, y el front muestra siempr
 | `GET /rooms?includeInactive=true` | autenticado (los members solo ven salas activas) |
 | `POST /rooms` · `PATCH /rooms/:id` | admin |
 | `GET /availability?date=YYYY-MM-DD&minCapacity=8` | autenticado |
-| `POST /reservations` · `GET /reservations/me` | autenticado |
+| `GET /availability/week?roomId=…&date=YYYY-MM-DD` | autenticado (semana de lunes a domingo que contiene `date`) |
+| `POST /reservations` | autenticado |
+| `POST /reservations/recurring` (mismo cuerpo + `weeks: 2–12`) | autenticado |
+| `GET /reservations/me?scope=upcoming\|past&page=1&pageSize=10` | autenticado |
+| `GET /reservations?page&pageSize&search&status&scope&roomId` | admin |
 | `POST /reservations/:id/cancel` | dueño o admin |
+| `GET /health` | público |
+| `GET /metrics` | admin |
 
 El detalle de cada endpoint (cuerpos y respuestas) está en Swagger (`/docs`).
+
+Los listados paginados responden `{ items, meta: { page, pageSize, totalItems, totalPages } }`. `pageSize` va de 1 a 100 (por defecto 10) y `page` de 1 a 100 000, para que el `OFFSET` nunca desborde.
 
 ## Decisiones técnicas
 
@@ -143,6 +163,20 @@ El detalle de cada endpoint (cuerpos y respuestas) está en Swagger (`/docs`).
   - La caducidad se configura con `JWT_EXPIRES_IN` (8 h).
 - **Email único y en minúsculas, garantizado por la BD:** `UNIQUE` + `CHECK (email = lower(email))`. Dos registros simultáneos con el mismo email terminan en `409`.
 - **Cancelar es un cambio de estado** (`POST /reservations/:id/cancel`), no un borrado: el historial se conserva. Dos cancelaciones a la vez se resuelven con un `UPDATE ... WHERE status = 'active'`.
+- **Paginación en el servidor:**
+  - Los listados de reservas (las mías y la del admin) se filtran, ordenan y paginan en la BD con `LIMIT/OFFSET` + `COUNT`; el front solo pide una página y pinta el `meta` que recibe.
+  - Orden estable con desempate por `id`, para que no se repitan ni salten filas entre páginas.
+  - La búsqueda del admin es `unaccent(...) ILIKE unaccent(...)` sobre título, sala, nombre y email del usuario, escapando `%` y `_`: «reunion» encuentra «Reunión» y «nunez» encuentra «Ñúñez» (extensión `unaccent`, en una migración). El front la envía con *debounce* (300 ms).
+  - «Próximas»/«Pasadas» se separan **solo por fecha** (`ends_at` frente a ahora), independiente del estado: así el filtro admin «Canceladas + Próximas» funciona.
+  - El estado de los listados (pestaña, página, búsqueda y filtros) vive en la **URL** (`?tab=past&page=2`, `?q=…&status=…&page=…`): recargar, ir atrás o compartir el enlace lo conserva. Cambiar un filtro vuelve a la página 1.
+- **Robustez de la API:** un byte nulo (`\u0000`) en cualquier texto se rechaza con `400` antes de llegar a Postgres. Los errores de validación dicen primero el problema de tipo («debe ser un número entero») y los campos no permitidos se explican en español.
+- **Cancelar sin sorpresas:**
+  - El diálogo explica que la sala queda libre y que no se puede deshacer, con opciones claras: «Sí, cancelar reserva» y «No, mantenerla».
+  - Cada botón tiene un `aria-label` con la reserva.
+  - Si la reserva ya estaba cancelada (por otra pestaña o por un reintento), el diálogo se cierra y la lista se refresca.
+- **Errores de carga recuperables:** los listados muestran «Reintentar» y vuelven a cargar solos al recuperar la conexión. Si el solape es con una reserva propia (p. ej. un reintento tras perder la respuesta), el 409 lo dice: «Ya tienes una reserva en esta sala…».
+- **Zona horaria visible:** las horas se muestran en la zona de la sala y, si no coincide con la del navegador, se indica («hora de Buenos Aires»).
+  - `GET /rooms` y la disponibilidad no se paginan: el número de salas es pequeño y la pantalla las necesita todas.
 - **Backend por módulos:** `src/modules/{auth,users,rooms,reservations,availability}`, cada uno con sus `entities`, `dtos`, `decorators`, `guards` e `interfaces`. Lo compartido va en `src/common` (excepciones, filtro global, pipes, utilidades de tiempo) y la configuración en `src/config`.
 - **Migraciones explícitas** (`synchronize: false`): se escriben a mano porque TypeORM no genera la restricción `EXCLUDE`, y se ejecutan al arrancar.
 - **Front sencillo a propósito:**
@@ -158,14 +192,20 @@ El detalle de cada endpoint (cuerpos y respuestas) está en Swagger (`/docs`).
 - **API, unitarios** (`pnpm test`):
   - reglas de la sección 4, con los bordes de 15 min, 4 h, empezar justo ahora y reservas pegadas;
   - conversión de zonas horarias, incluido el horario de verano;
-  - formato de errores, validación y entorno.
+  - formato de errores, validación y entorno;
+  - fechas de una serie semanal y de la semana (lunes a domingo), métricas y request id.
 - **API, e2e** (`pnpm test:e2e`), contra Postgres real:
   - auth, salas, reservas, disponibilidad y permisos;
-  - **concurrencia**;
+  - paginación, búsqueda y filtros de los listados;
+  - reservas recurrentes (todo o nada, todas las fechas que chocan, reglas por ocurrencia);
+  - calendario semanal (día local de cada reserva, salas desactivadas);
+  - `X-Request-Id`, `/health` y `/metrics`;
+  - **concurrencia**, también entre dos series que compiten por la misma semana;
   - códigos HTTP y mensajes.
 - **Web** (`pnpm test`):
-  - cliente de la API (Bearer, errores, 401);
-  - validaciones de tiempo en el front;
+  - cliente de la API (Bearer, errores, 401, query de paginación);
+  - componente de paginación;
+  - validaciones de tiempo en el front, fechas de la serie y posición de las reservas en el calendario;
   - formularios;
   - desplegable y calendario (teclado y accesibilidad).
 
@@ -177,16 +217,19 @@ Decisiones tomadas donde el enunciado no lo especifica:
 - Al desactivar una sala, sus **reservas futuras se mantienen**: solo se bloquean las nuevas. El admin puede cancelarlas una a una.
 - «El admin puede cancelar cualquiera» significa de cualquier usuario, pero solo si no ha empezado.
 - Una reserva no puede cruzar la medianoche: inicio y fin son del mismo día de la sala.
-- «Próximas» incluye las reservas en curso. «Pasadas» incluye las terminadas y las canceladas.
+- Una serie recurrente es semanal y se valida entera: si una sola fecha choca o rompe una regla, no se crea ninguna. Las semanas de una serie mantienen la hora de pared de la sala aunque haya un cambio de horario de verano en medio.
+- «Próximas» incluye las reservas en curso y las canceladas que aún no han pasado (marcadas como canceladas). «Pasadas» son las ya terminadas.
 
 ## Qué quedó fuera / qué haría con más tiempo
 
 - **Sesiones:** refresh tokens y revocación (lista de tokens revocados o sesiones en BD). Hoy el JWT dura 8 h y cerrar sesión borra el token en el cliente.
 - **Token en cookie `httpOnly`** en lugar de `localStorage`, para reducir la exposición a XSS. Se eligió Bearer por simplicidad.
-- **Opcionales del enunciado no hechos:** paginación y búsqueda en un listado de reservas para el admin, reservas recurrentes y vista de calendario semanal.
+- **Opcionales del enunciado no hechos:** CI y deploy por URL (ver abajo).
+- **Series recurrentes:** hoy cada ocurrencia se cancela por separado; con más tiempo, «cancelar el resto de la serie» usando `series_id`, y otras frecuencias (diaria, cada 2 semanas).
+- **Paginación por cursor** (keyset sobre `starts_at, id`) si el volumen creciera mucho: `OFFSET` se degrada en páginas profundas. Y un índice trigram (`pg_trgm`) sobre `unaccent(...)` para la búsqueda.
 - **Editar reservas:** hoy solo se crean y se cancelan.
 - **Límite de peticiones** en login y registro (`@nestjs/throttler`).
-- **Observabilidad:** logs estructurados con id de petición y métricas.
+- **Observabilidad:** las métricas viven en memoria del proceso y se pierden al reiniciar. Con más tiempo, exportarlas a Prometheus u OpenTelemetry y mandar los logs JSON a un colector.
 - **CI** con GitHub Actions que corra lint y tests (unitarios + e2e con un servicio de Postgres).
 - **Despliegue:** la API y la web estáticas detrás de **Caddy** como proxy inverso con HTTPS automático. No se incluye su configuración porque depende del destino.
 - **Rendimiento del front:** cargar `motion` con `LazyMotion` para reducir unos 145 kB del bundle.
