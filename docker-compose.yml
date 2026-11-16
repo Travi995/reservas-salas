@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: reservas-salas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-reservas}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-reservas}
+      POSTGRES_DB: ${DB_NAME:-reservas}
+    ports:
+      - '${DB_PORT:-5440}:5432'
+    volumes:
+      # Los datos quedan dentro del proyecto (ignorado en git).
+      - ./data_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10

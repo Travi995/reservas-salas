@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Datos locales de Postgres (volumen de docker compose)
+data_postgres/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Editor / SO
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

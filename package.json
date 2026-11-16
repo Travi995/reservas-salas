@@ -1,0 +1,14 @@
+{
+  "name": "reservas-salas",
+  "private": true,
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev:api": "pnpm --filter @reservas/api start:dev",
+    "dev:web": "pnpm --filter @reservas/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  }
+}
