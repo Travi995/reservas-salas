@@ -1,7 +1,17 @@
 import { CalendarX2, ChevronLeft, ChevronRight, SearchX } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Button, EmptyState, ErrorState, DatePicker, PageHeader, PageLoader, Select } from '../../components/ui'
+import {
+  Button,
+  DatePicker,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  PageLoader,
+  Pagination,
+  Select,
+  ViewportPage,
+} from '../../components/ui'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { formatLongDate, isISODate, nowIn, todayISO } from '../../lib/time'
@@ -11,6 +21,7 @@ import { CancelReservationDialog } from '../reservations/CancelReservationDialog
 import { ReservationDialog } from '../reservations/ReservationDialog'
 import { RoomDayCard } from './RoomDayCard'
 import { Stagger, StaggerItem } from '../../components/motion'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, pageFromParams, pageSizeFromParams } from '../reservations/url-state'
 
 const CAPACITY_OPTIONS = [
   { value: '', label: 'Cualquiera' },
@@ -40,20 +51,39 @@ export function AvailabilityPage() {
   const [booking, setBooking] = useState<{ roomId: string; date: string } | null>(null)
   const [cancelling, setCancelling] = useState<{ slot: ReservationSlot; room: Room } | null>(null)
 
+  // Changing the date or the capacity goes back to page 1, like the filters of the other listings.
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
+    next.delete('page')
     setParams(next, { replace: true })
   }
 
   const rooms = data?.rooms ?? []
 
-  return (
-    <>
-      <PageHeader title="Disponibilidad" description={`Horarios ocupados del ${formatLongDate(date)}.`} />
+  // The API returns every room of the day, so the browser pages them (as in Salas). Page and size live in the URL.
+  const pageSize = pageSizeFromParams(params)
+  const totalPages = Math.ceil(rooms.length / pageSize)
+  // A page that no longer exists (e.g. after raising the minimum capacity) shows the last one.
+  const page = Math.min(pageFromParams(params), Math.max(totalPages, 1))
+  const pageRooms = rooms.slice((page - 1) * pageSize, page * pageSize)
+  const goToPage = (next: { page?: number; size?: number }) => {
+    const q = new URLSearchParams(params)
+    const p = next.page ?? 1
+    const size = next.size ?? pageSize
+    if (p > 1) q.set('page', String(p))
+    else q.delete('page')
+    if (size !== DEFAULT_PAGE_SIZE) q.set('size', String(size))
+    else q.delete('size')
+    setParams(q)
+  }
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
+  return (
+    <ViewportPage>
+      <PageHeader compact title="Disponibilidad" description={`Horarios ocupados del ${formatLongDate(date)}.`} />
+
+      <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
         <div className="flex items-end gap-2">
           <Button
             variant="secondary"
@@ -104,26 +134,39 @@ export function AvailabilityPage() {
           </EmptyState>
         )
       ) : (
-        <Stagger
-          key={`${date}-${minCapacity}`}
-          className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-2 ${loading ? 'opacity-60' : ''}`}
-        >
-          {rooms.map(({ room, reservations }) => (
-            <StaggerItem key={room.id}>
-              <RoomDayCard
-                room={room}
-                slots={reservations}
-                user={user!}
-                onReserve={() => {
-                  // Never earlier than the room's own today (it can differ from the browser's).
-                  const roomToday = nowIn(room.timezone).date
-                  setBooking({ roomId: room.id, date: date < roomToday ? roomToday : date })
-                }}
-                onCancel={(slot) => setCancelling({ slot, room })}
-              />
-            </StaggerItem>
-          ))}
-        </Stagger>
+        <>
+          {/* Only this area scrolls; the filters above and the pagination below stay in place. */}
+          <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+            <Stagger
+              key={`${date}-${minCapacity}-${page}-${pageSize}`}
+              className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-2 ${loading ? 'opacity-60' : ''}`}
+            >
+              {pageRooms.map(({ room, reservations }) => (
+                <StaggerItem key={room.id}>
+                  <RoomDayCard
+                    room={room}
+                    slots={reservations}
+                    user={user!}
+                    onReserve={() => {
+                      // Never earlier than the room's own today (it can differ from the browser's).
+                      const roomToday = nowIn(room.timezone).date
+                      setBooking({ roomId: room.id, date: date < roomToday ? roomToday : date })
+                    }}
+                    onCancel={(slot) => setCancelling({ slot, room })}
+                  />
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+          <div className="shrink-0">
+            <Pagination
+              meta={{ page, pageSize, totalItems: rooms.length, totalPages }}
+              onPageChange={(p) => goToPage({ page: p })}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={(size) => goToPage({ size })}
+            />
+          </div>
+        </>
       )}
 
       <ReservationDialog
@@ -149,6 +192,6 @@ export function AvailabilityPage() {
         onClose={() => setCancelling(null)}
         onDone={reload}
       />
-    </>
+    </ViewportPage>
   )
 }
