@@ -26,6 +26,8 @@ import { hhmm, mondayOf, shiftDays, slotBox, visibleRange } from './week'
 /** Pixels per minute. The grid adapts to the height available (so the page needs no scroll), within these bounds. */
 const PX_MIN = 0.5
 const PX_MAX = 1
+/** Cards at least this tall (px) show the title and the time on separate lines; shorter ones fit both on one. */
+const CARD_TWO_LINES_PX = 34
 /** Height of the sticky row with the day names, which is not part of the hours area. */
 const HEADER_PX = 40
 
@@ -257,6 +259,10 @@ export function WeekCalendarPage() {
                         const mine = s.userId === user?.id
                         const time = `${formatTime(s.startsAt, tz)}–${formatTime(s.endsAt, tz)}`
                         const cancellable = canCancel(s)
+                        const owner = mine ? 'Tú' : s.userName
+                        // The pixel height of the card decides its layout: two lines need ~34 px, otherwise one.
+                        const height = Math.max(box.height * PX - 2, 16)
+                        const twoLines = height >= CARD_TWO_LINES_PX
                         return (
                           <button
                             key={s.id}
@@ -268,16 +274,25 @@ export function WeekCalendarPage() {
                               cancellable ? '. Pulsa para cancelar' : ''
                             }`}
                             className={cn(
-                              'absolute inset-x-1 z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-0.5 text-left text-xs',
+                              'absolute inset-x-1 z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-px text-left text-xs leading-4',
                               mine ? 'border-primary bg-primary-soft text-fg' : 'border-danger bg-danger-soft text-fg',
                               cancellable ? 'cursor-pointer hover:brightness-95' : 'cursor-default',
                             )}
-                            style={{ top: box.top * PX + 1, height: Math.max(box.height * PX - 2, 16) }}
+                            style={{ top: box.top * PX + 1, height }}
                           >
-                            <span className="block truncate font-semibold">{s.title}</span>
-                            {box.height >= 30 && (
-                              <span className="block truncate text-muted-fg tabular-nums">
-                                {time} · {mine ? 'Tú' : s.userName}
+                            {twoLines ? (
+                              <>
+                                <span className="block truncate font-semibold">{s.title}</span>
+                                {/* The time never truncates; the name gives way when the column is narrow. */}
+                                <span className="flex gap-1 tabular-nums">
+                                  <span className="shrink-0 font-medium">{time}</span>
+                                  <span className="truncate opacity-75">· {owner}</span>
+                                </span>
+                              </>
+                            ) : (
+                              <span className="flex gap-1 tabular-nums">
+                                <span className="shrink-0 font-semibold">{formatTime(s.startsAt, tz)}</span>
+                                <span className="truncate font-semibold">{s.title}</span>
                               </span>
                             )}
                           </button>
