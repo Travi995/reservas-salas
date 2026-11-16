@@ -7,15 +7,15 @@ type Size = 'md' | 'sm'
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-primary text-primary-fg hover:bg-primary-hover',
-  secondary: 'border border-border bg-surface text-fg hover:bg-muted',
+  secondary: 'border border-control bg-surface text-fg hover:bg-muted',
   ghost: 'text-muted-fg hover:bg-muted hover:text-fg',
-  danger: 'border border-border bg-surface text-danger hover:bg-danger-soft',
+  danger: 'border border-danger/60 bg-surface text-danger hover:bg-danger-soft',
 }
 
-// md = 44px (minimum touch target). sm = 36px, only for secondary actions in dense rows.
+// md = 44px (minimum touch target). sm is also 44px on touch layouts and 36px from `sm` up (dense rows with a mouse).
 const SIZES: Record<Size, string> = {
   md: 'h-11 px-4 text-sm',
-  sm: 'h-9 px-3 text-sm',
+  sm: 'h-11 px-3 text-sm sm:h-9',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

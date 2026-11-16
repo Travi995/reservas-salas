@@ -2,21 +2,23 @@ import type { CSSProperties } from 'react'
 import { Toaster as Sonner } from 'sonner'
 import { useTheme } from '../lib/theme'
 
-/** Global toaster (mounted once in App). Colors come from the design system tokens. */
+/** Global toaster (mounted once in App), on the right of the screen. Colors come from the design system tokens. */
 export function Toaster() {
   const { theme } = useTheme()
   return (
     <Sonner
       theme={theme}
-      position="top-center"
+      position="top-right"
       richColors
       closeButton
-      duration={4000}
+      duration={6000}
+      containerAriaLabel="Avisos"
       visibleToasts={3}
       offset={16}
       mobileOffset={12}
       toastOptions={{
         className: 'font-sans',
+        closeButtonAriaLabel: 'Cerrar aviso',
         style: { borderRadius: '0.75rem' },
       }}
       style={

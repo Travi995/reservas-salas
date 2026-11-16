@@ -8,14 +8,17 @@ import { ThemeToggle } from './ThemeToggle'
 import { Logo, cn } from './ui'
 
 const NAV = [
-  { to: '/', label: 'Disponibilidad', icon: CalendarDays, admin: false },
-  { to: '/calendario', label: 'Calendario', icon: CalendarRange, admin: false },
-  { to: '/mis-reservas', label: 'Mis reservas', icon: CalendarCheck, admin: false },
-  { to: '/admin/reservas', label: 'Reservas', icon: ClipboardList, admin: true },
-  { to: '/admin/salas', label: 'Salas', icon: DoorOpen, admin: true },
+  { to: '/', label: 'Disponibilidad', short: 'Día', icon: CalendarDays, admin: false },
+  { to: '/calendario', label: 'Calendario', short: 'Semana', icon: CalendarRange, admin: false },
+  { to: '/mis-reservas', label: 'Mis reservas', short: 'Mías', icon: CalendarCheck, admin: false },
+  { to: '/admin/reservas', label: 'Reservas', short: 'Todas', icon: ClipboardList, admin: true },
+  { to: '/admin/salas', label: 'Salas', short: 'Salas', icon: DoorOpen, admin: true },
 ]
 
-/** Header with navigation at ≥ sm; fixed bottom bar on mobile (ADR-0008). */
+/**
+ * Header with navigation at ≥ sm; fixed bottom bar on mobile (ADR-0008).
+ * With five entries (admin) the bottom bar uses the short labels so none is cut at 320 px.
+ */
 export function AppShell() {
   const { user, logout } = useAuth()
   const items = NAV.filter((item) => !item.admin || user?.role === 'admin')
@@ -24,9 +27,9 @@ export function AppShell() {
   return (
     <div className="relative isolate flex min-h-svh flex-col">
       <AnimatedBackground />
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <NavLink to="/" aria-label="Salas, inicio">
+          <NavLink to="/" aria-label="Inicio: disponibilidad">
             <Logo />
           </NavLink>
           <nav aria-label="Principal" className="hidden flex-1 gap-1 sm:flex">
@@ -85,17 +88,18 @@ export function AppShell() {
 
       <nav
         aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         <ul className="flex">
-          {items.map(({ to, label, icon: Icon }) => (
-            <li key={to} className="flex-1">
+          {items.map(({ to, label, short, icon: Icon }) => (
+            <li key={to} className="min-w-0 flex-1">
               <NavLink
                 to={to}
                 end={to === '/'}
+                aria-label={label}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium',
+                    'relative flex h-16 min-w-0 flex-col items-center justify-center gap-1 px-0.5 text-center text-[11px] leading-tight font-medium min-[400px]:text-xs',
                     isActive ? 'text-primary' : 'text-muted-fg',
                   )
                 }
@@ -110,7 +114,7 @@ export function AppShell() {
                       />
                     )}
                     <Icon aria-hidden="true" className="size-5" />
-                    {label}
+                    <span className="max-w-full truncate">{items.length > 4 ? short : label}</span>
                   </>
                 )}
               </NavLink>

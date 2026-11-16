@@ -46,7 +46,7 @@ export function InputField({ label, error, hint, className, ...props }: InputFie
           id={id}
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
-          className={cn(CONTROL, invalid ? 'border-danger' : 'border-border')}
+          className={cn(CONTROL, invalid ? 'border-danger' : 'border-control')}
           {...props}
         />
       )}

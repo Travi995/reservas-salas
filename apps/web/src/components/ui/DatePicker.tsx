@@ -194,7 +194,7 @@ export function DatePicker({
               openCalendar()
             }
           }}
-          className={cn(TRIGGER, invalid ? 'border-danger' : 'border-border')}
+          className={cn(TRIGGER, invalid ? 'border-danger' : 'border-control')}
         >
           <span id={valueId} className={cn('min-w-0 flex-1 truncate', !selectedDate && 'text-muted-fg')}>
             {selectedDate ? formatShortDate(selectedDate) : placeholder}
