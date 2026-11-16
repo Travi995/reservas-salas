@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { applyApiError, rules } from '../../lib/forms'
 import { notify } from '../../lib/notify'
 import { AuthLayout } from './AuthLayout'
+import { SocialButtons } from './SocialButtons'
 
 const MIN_PASSWORD = 8
 
@@ -73,6 +74,9 @@ export function RegisterPage() {
           Crear cuenta
         </Button>
       </form>
+      <div className="mt-4">
+        <SocialButtons action="register" />
+      </div>
       <p className="mt-5 text-center text-sm text-muted-fg">
         ¿Ya tienes cuenta?{' '}
         <Link to="/login" className="font-semibold text-primary hover:underline">

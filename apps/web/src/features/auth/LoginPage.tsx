@@ -5,6 +5,7 @@ import { Alert, Button, InputField } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { applyApiError, rules } from '../../lib/forms'
 import { AuthLayout } from './AuthLayout'
+import { SocialButtons } from './SocialButtons'
 
 interface LoginForm {
   email: string
@@ -56,6 +57,9 @@ export function LoginPage() {
           Entrar
         </Button>
       </form>
+      <div className="mt-4">
+        <SocialButtons action="login" />
+      </div>
       <p className="mt-5 text-center text-sm text-muted-fg">
         ¿No tienes cuenta?{' '}
         <Link to="/registro" className="font-semibold text-primary hover:underline">
