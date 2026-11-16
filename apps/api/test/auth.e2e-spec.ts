@@ -21,7 +21,7 @@ describe('Auth (e2e)', () => {
   describe('POST /api/auth/register', () => {
     it('201: creates a member, normalizes the email and does not return the password', async () => {
       const res = await http()
-        .post('/api/auth/register')
+        .post('/api/v1/auth/register')
         .send({
           name: ' Ana ',
           email: ' Ana@Demo.COM ',
@@ -41,7 +41,7 @@ describe('Auth (e2e)', () => {
 
     it('stores the password as an argon2id hash, not in plain text', async () => {
       await http()
-        .post('/api/auth/register')
+        .post('/api/v1/auth/register')
         .send({ name: 'Ana', email: 'ana@demo.com', password: 'password123' });
       const [row] = await ctx.db.query(
         `SELECT password_hash FROM users WHERE email = 'ana@demo.com'`,
@@ -52,7 +52,7 @@ describe('Auth (e2e)', () => {
 
     it('rejects a role sent in the body: 400 for a non-whitelisted field', async () => {
       const res = await http()
-        .post('/api/auth/register')
+        .post('/api/v1/auth/register')
         .send({
           name: 'Eve',
           email: 'eve@demo.com',
@@ -65,7 +65,7 @@ describe('Auth (e2e)', () => {
 
     it('400: per-field validation errors', async () => {
       const res = await http()
-        .post('/api/auth/register')
+        .post('/api/v1/auth/register')
         .send({ name: '', email: 'no-email', password: '123' })
         .expect(400);
       expect(res.body.error).toMatchObject({
@@ -90,7 +90,7 @@ describe('Auth (e2e)', () => {
         password: 'password123',
       });
       const res = await http()
-        .post('/api/auth/register')
+        .post('/api/v1/auth/register')
         .send({ name: 'Ana', email: 'ANA@demo.com', password: 'password123' })
         .expect(409);
       expect(res.body.error.code).toBe('EMAIL_TAKEN');
@@ -108,7 +108,7 @@ describe('Auth (e2e)', () => {
 
     it('200: returns token and user', async () => {
       const res = await http()
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'Admin@demo.com', password: 'password123' })
         .expect(200);
       expect(res.body.user.role).toBe('admin');
@@ -116,11 +116,11 @@ describe('Auth (e2e)', () => {
 
     it('401: same message for wrong password and unknown email', async () => {
       const wrong = await http()
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'admin@demo.com', password: 'nope' })
         .expect(401);
       const missing = await http()
-        .post('/api/auth/login')
+        .post('/api/v1/auth/login')
         .send({ email: 'nadie@demo.com', password: 'nope' })
         .expect(401);
       expect(wrong.body).toEqual(missing.body);
@@ -131,7 +131,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('400: malformed body', async () => {
-      await http().post('/api/auth/login').send({ email: 'x' }).expect(400);
+      await http().post('/api/v1/auth/login').send({ email: 'x' }).expect(400);
     });
   });
 
@@ -139,25 +139,25 @@ describe('Auth (e2e)', () => {
     it('200 with a valid Bearer token', async () => {
       const { token } = await loginAs(ctx, 'ana@demo.com');
       const res = await http()
-        .get('/api/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
       expect(res.body.email).toBe('ana@demo.com');
     });
 
     it('401 without a token', async () => {
-      const res = await http().get('/api/auth/me').expect(401);
+      const res = await http().get('/api/v1/auth/me').expect(401);
       expect(res.body.error.code).toBe('UNAUTHORIZED');
     });
 
     it('401 with an invalid token or a non-Bearer scheme', async () => {
       await http()
-        .get('/api/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', 'Bearer abc.def.ghi')
         .expect(401);
       const { token } = await loginAs(ctx, 'ana@demo.com');
       await http()
-        .get('/api/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', `Basic ${token}`)
         .expect(401);
     });
@@ -166,7 +166,7 @@ describe('Auth (e2e)', () => {
       const { token } = await loginAs(ctx, 'ana@demo.com');
       await resetDb(ctx.db);
       const res = await http()
-        .get('/api/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', `Bearer ${token}`)
         .expect(401);
       expect(res.body.error.code).toBe('INVALID_TOKEN');
@@ -174,7 +174,7 @@ describe('Auth (e2e)', () => {
   });
 
   it('404 with the unified error format on unknown routes', async () => {
-    const res = await http().get('/api/no-existe').expect(404);
+    const res = await http().get('/api/v1/no-existe').expect(404);
     expect(res.body).toEqual({
       error: { code: 'NOT_FOUND', message: 'El recurso no existe.' },
     });

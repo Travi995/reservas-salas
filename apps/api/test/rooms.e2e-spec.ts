@@ -28,7 +28,7 @@ describe('Rooms (e2e)', () => {
   afterAll(() => ctx.app.close());
 
   const createRoom = (body: object = ROOM) =>
-    http().post('/api/rooms').set(asAdmin()).send(body);
+    http().post('/api/v1/rooms').set(asAdmin()).send(body);
 
   describe('POST /api/rooms', () => {
     it('201: admin creates an active room with the default time zone', async () => {
@@ -63,7 +63,7 @@ describe('Rooms (e2e)', () => {
 
     it('403: members cannot create rooms', async () => {
       const res = await http()
-        .post('/api/rooms')
+        .post('/api/v1/rooms')
         .set(asMember())
         .send(ROOM)
         .expect(403);
@@ -71,7 +71,7 @@ describe('Rooms (e2e)', () => {
     });
 
     it('401: requires a token', async () => {
-      await http().post('/api/rooms').send(ROOM).expect(401);
+      await http().post('/api/v1/rooms').send(ROOM).expect(401);
     });
   });
 
@@ -79,7 +79,7 @@ describe('Rooms (e2e)', () => {
     it('200: admin edits and deactivates a room', async () => {
       const { body: room } = await createRoom();
       const res = await http()
-        .patch(`/api/rooms/${room.id}`)
+        .patch(`/api/v1/rooms/${room.id}`)
         .set(asAdmin())
         .send({ capacity: 10, isActive: false })
         .expect(200);
@@ -92,7 +92,7 @@ describe('Rooms (e2e)', () => {
 
     it('404: unknown room', async () => {
       const res = await http()
-        .patch('/api/rooms/00000000-0000-4000-8000-000000000000')
+        .patch('/api/v1/rooms/00000000-0000-4000-8000-000000000000')
         .set(asAdmin())
         .send({ capacity: 3 })
         .expect(404);
@@ -101,7 +101,7 @@ describe('Rooms (e2e)', () => {
 
     it('400: malformed id', async () => {
       const res = await http()
-        .patch('/api/rooms/not-a-uuid')
+        .patch('/api/v1/rooms/not-a-uuid')
         .set(asAdmin())
         .send({ capacity: 3 })
         .expect(400);
@@ -113,7 +113,7 @@ describe('Rooms (e2e)', () => {
     it('403: members cannot edit rooms', async () => {
       const { body: room } = await createRoom();
       await http()
-        .patch(`/api/rooms/${room.id}`)
+        .patch(`/api/v1/rooms/${room.id}`)
         .set(asMember())
         .send({ isActive: false })
         .expect(403);
@@ -127,7 +127,7 @@ describe('Rooms (e2e)', () => {
         name: 'Sala Vieja',
       });
       await http()
-        .patch(`/api/rooms/${inactive.id}`)
+        .patch(`/api/v1/rooms/${inactive.id}`)
         .set(asAdmin())
         .send({ isActive: false });
       await createRoom();
@@ -135,7 +135,7 @@ describe('Rooms (e2e)', () => {
 
     it('members only see active rooms, even when asking for inactive ones', async () => {
       const res = await http()
-        .get('/api/rooms?includeInactive=true')
+        .get('/api/v1/rooms?includeInactive=true')
         .set(asMember())
         .expect(200);
       expect(res.body.map((r: { name: string }) => r.name)).toEqual([
@@ -145,7 +145,7 @@ describe('Rooms (e2e)', () => {
 
     it('admins can include inactive rooms', async () => {
       const res = await http()
-        .get('/api/rooms?includeInactive=true')
+        .get('/api/v1/rooms?includeInactive=true')
         .set(asAdmin())
         .expect(200);
       expect(res.body.map((r: { name: string }) => r.name)).toEqual([
@@ -156,7 +156,7 @@ describe('Rooms (e2e)', () => {
 
     it('400: includeInactive must be a boolean', async () => {
       await http()
-        .get('/api/rooms?includeInactive=maybe')
+        .get('/api/v1/rooms?includeInactive=maybe')
         .set(asAdmin())
         .expect(400);
     });

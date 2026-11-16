@@ -9,7 +9,9 @@ import type {
   User,
 } from './types'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
+/** Backend base URL from apps/web/.env (see .env.example). Fail loudly instead of calling the wrong host. */
+const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
+if (!BASE_URL) throw new Error('VITE_API_URL is not set: copy apps/web/.env.example to apps/web/.env')
 const TOKEN_KEY = 'reservas.token'
 
 export interface FieldError {
