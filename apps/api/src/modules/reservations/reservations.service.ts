@@ -20,6 +20,10 @@ import type { CreateRecurringReservationDto } from './dtos/create-recurring-rese
 import type { CreateReservationDto } from './dtos/create-reservation.dto.js';
 import type { ListReservationsQueryDto } from './dtos/list-reservations-query.dto.js';
 import type {
+  SortedPaginationQueryDto,
+  SortField,
+} from './dtos/sorted-pagination-query.dto.js';
+import type {
   MyReservationsQueryDto,
   ReservationScope,
 } from './dtos/my-reservations-query.dto.js';
@@ -43,6 +47,19 @@ interface Slot {
 
 /** Lost a race against another booking of the same room: both are answered as a 409, never a 500. */
 const LOST_RACE = [PG.EXCLUSION_VIOLATION, PG.DEADLOCK_DETECTED];
+
+/**
+ * SQL expression behind each sortable column (fixed strings: user input only selects one).
+ * Text is compared case-insensitively; `time` is the time of day in the room's own time zone.
+ */
+const SORT_EXPRESSIONS: Record<SortField, string> = {
+  date: 'r.starts_at',
+  time: '(r.starts_at AT TIME ZONE room.time_zone)::time',
+  title: 'LOWER(r.title)',
+  room: 'LOWER(room.name)',
+  user: 'LOWER("user".name)',
+  status: 'r.status::text',
+};
 
 @Injectable()
 export class ReservationsService {
@@ -185,6 +202,7 @@ export class ReservationsService {
       .clone()
       .andWhere('r.status = :active', { active: ReservationStatus.Active })
       .getCount();
+    this.applySort(qb, query, { withUser: false });
     const page = await this.page(qb, query.page, query.pageSize, (r) =>
       this.toResponse(r),
     );
@@ -225,6 +243,7 @@ export class ReservationsService {
     if (query.scope) this.applyScope(qb, query.scope);
     else qb.orderBy('r.starts_at', 'DESC').addOrderBy('r.id', 'ASC');
 
+    this.applySort(qb, query, { withUser: true });
     return this.page(qb, query.page, query.pageSize, (r) => ({
       ...this.toResponse(r),
       user: { id: r.user.id, name: r.user.name, email: r.user.email },
@@ -250,6 +269,23 @@ export class ReservationsService {
         .orderBy('r.starts_at', 'DESC')
         .addOrderBy('r.id', 'ASC');
     }
+  }
+
+  /**
+   * Optional column sort chosen by the client; replaces the default order of the listing.
+   * Ties fall back to start time and id so pagination stays stable. Case-insensitive for text.
+   */
+  private applySort(
+    qb: SelectQueryBuilder<Reservation>,
+    { sortBy, sortDir }: Pick<SortedPaginationQueryDto, 'sortBy' | 'sortDir'>,
+    /** «My reservations» has no `user` join (every row is the caller's), so that column is a no-op there. */
+    { withUser }: { withUser: boolean },
+  ) {
+    if (!sortBy || (sortBy === 'user' && !withUser)) return;
+    qb.addSelect(SORT_EXPRESSIONS[sortBy], 'sort_key')
+      .orderBy('sort_key', sortDir === 'desc' ? 'DESC' : 'ASC')
+      .addOrderBy('r.starts_at', 'ASC')
+      .addOrderBy('r.id', 'ASC');
   }
 
   /** LIMIT/OFFSET + COUNT in the database; the client never receives more than one page. */

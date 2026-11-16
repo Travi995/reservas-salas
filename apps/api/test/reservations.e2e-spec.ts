@@ -527,4 +527,82 @@ describe('Reservations (e2e)', () => {
       await cancel(ana.token, 'nope').expect(400);
     });
   });
+  describe('sorting (sortBy / sortDir)', () => {
+    const titles = (body: { items: { title: string }[] }) =>
+      body.items.map((r) => r.title);
+    const mine = (qs: string) =>
+      http().get(`/api/v1/reservations/me${qs}`).set(auth(ana.token));
+
+    beforeEach(async () => {
+      await book(ana.token, {
+        title: 'b-late',
+        startTime: '14:00',
+        endTime: '15:00',
+      });
+      await book(ana.token, {
+        title: 'A-early',
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+      await book(ana.token, {
+        title: 'c-mid',
+        startTime: '11:00',
+        endTime: '12:00',
+      });
+    });
+
+    it('sorts text case-insensitively, in both directions', async () => {
+      const asc = await mine('?sortBy=title&sortDir=asc').expect(200);
+      expect(titles(asc.body)).toEqual(['A-early', 'b-late', 'c-mid']);
+      const desc = await mine('?sortBy=title&sortDir=desc').expect(200);
+      expect(titles(desc.body)).toEqual(['c-mid', 'b-late', 'A-early']);
+    });
+
+    it('ascending is the default direction', async () => {
+      const res = await mine('?sortBy=title').expect(200);
+      expect(titles(res.body)).toEqual(['A-early', 'b-late', 'c-mid']);
+    });
+
+    it('sorts by time of day, not by date', async () => {
+      const res = await mine('?sortBy=time&sortDir=desc').expect(200);
+      expect(titles(res.body)).toEqual(['b-late', 'c-mid', 'A-early']);
+    });
+
+    it('sorts the whole result before paginating, so pages follow the chosen order', async () => {
+      const p1 = await mine(
+        '?sortBy=title&sortDir=desc&pageSize=2&page=1',
+      ).expect(200);
+      const p2 = await mine(
+        '?sortBy=title&sortDir=desc&pageSize=2&page=2',
+      ).expect(200);
+      expect(titles(p1.body)).toEqual(['c-mid', 'b-late']);
+      expect(titles(p2.body)).toEqual(['A-early']);
+    });
+
+    it('works for every sortable column in the admin listing', async () => {
+      for (const sortBy of [
+        'date',
+        'time',
+        'title',
+        'room',
+        'user',
+        'status',
+      ]) {
+        for (const sortDir of ['asc', 'desc']) {
+          const res = await http()
+            .get(`/api/v1/reservations?sortBy=${sortBy}&sortDir=${sortDir}`)
+            .set(auth(admin))
+            .expect(200);
+          expect(res.body.meta.totalItems).toBe(3);
+        }
+      }
+    });
+
+    it('400 for a column or direction that is not offered', async () => {
+      const res = await mine('?sortBy=password&sortDir=sideways').expect(400);
+      expect(
+        res.body.error.details.map((d: { field: string }) => d.field).sort(),
+      ).toEqual(['sortBy', 'sortDir']);
+    });
+  });
 });
