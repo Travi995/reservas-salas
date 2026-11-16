@@ -36,6 +36,10 @@ export class Reservation {
   @Column({ length: 120 })
   title: string;
 
+  /** Shared by every occurrence of a recurring reservation; null for one-off reservations. */
+  @Column({ name: 'series_id', type: 'uuid', nullable: true })
+  seriesId: string | null;
+
   @Column({ name: 'starts_at', type: 'timestamptz' })
   startsAt: Date;
 
