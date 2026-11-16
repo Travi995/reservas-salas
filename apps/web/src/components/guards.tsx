@@ -21,7 +21,7 @@ function SessionUnavailable() {
 export function RequireAuth() {
   const { user, checking, sessionError } = useAuth()
   const location = useLocation()
-  if (checking) return <PageLoader label="Comprobando sesión…" />
+  if (checking) return <PageLoader fullscreen label="Comprobando sesión…" />
   if (sessionError) return <SessionUnavailable />
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   return <Outlet />
@@ -41,7 +41,7 @@ export function RequireAdmin() {
 /** Login/register: if there is already a session, go to the app. */
 export function GuestOnly() {
   const { user, checking, sessionError } = useAuth()
-  if (checking) return <PageLoader label="Comprobando sesión…" />
+  if (checking) return <PageLoader fullscreen label="Comprobando sesión…" />
   if (sessionError) return <SessionUnavailable />
   if (user) return <Navigate to="/" replace />
   return <Outlet />

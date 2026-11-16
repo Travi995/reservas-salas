@@ -151,6 +151,36 @@
   }
 }
 
+/* SlotsLoader: each bar fills left to right, holds, fades and starts again; the delays make it a wave. */
+.slot-bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: slot-fill 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes slot-fill {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  32%,
+  78% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-bar {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
