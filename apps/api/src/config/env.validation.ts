@@ -12,6 +12,7 @@ export interface Env {
   DB_NAME: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
+  LOG_FORMAT: 'pretty' | 'json';
 }
 
 export const envSchema = Joi.object<Env, true>({
@@ -43,6 +44,8 @@ export const envSchema = Joi.object<Env, true>({
     .messages({
       'string.pattern.base': 'JWT_EXPIRES_IN must look like 30m, 8h or 7d',
     }),
+  // `json` = one JSON object per line (log collectors); `pretty` = readable lines in development.
+  LOG_FORMAT: Joi.string().valid('pretty', 'json').default('pretty'),
 });
 
 /**

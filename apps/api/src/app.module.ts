@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { RoomsModule } from './modules/rooms/rooms.module.js';
 import { ReservationsModule } from './modules/reservations/reservations.module.js';
 import { AvailabilityModule } from './modules/availability/availability.module.js';
+import { ObservabilityModule } from './modules/observability/observability.module.js';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AvailabilityModule } from './modules/availability/availability.module.j
     RoomsModule,
     ReservationsModule,
     AvailabilityModule,
+    ObservabilityModule,
   ],
 })
 export class AppModule {}

@@ -11,7 +11,10 @@ function run(exception: unknown) {
   const json = vi.fn((_body: { error: { code: string } }) => undefined);
   const status = vi.fn((_code: number) => ({ json }));
   const host = {
-    switchToHttp: () => ({ getResponse: () => ({ status }) }),
+    switchToHttp: () => ({
+      getResponse: () => ({ status, locals: { requestId: 'req-1' } }),
+      getRequest: () => ({ method: 'POST', originalUrl: '/api/v1/x?q=1' }),
+    }),
   } as unknown as ArgumentsHost;
   new AllExceptionsFilter().catch(exception, host);
   return { status: status.mock.calls[0][0], body: json.mock.calls[0][0] };
@@ -47,5 +50,15 @@ describe('AllExceptionsFilter', () => {
     expect(res.status).toBe(500);
     expect(JSON.stringify(res.body)).not.toContain('secret');
     expect(res.body.error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('logs the request id and path (without query string) of an unexpected error', () => {
+    const error = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    run(new Error('boom'));
+    const line = String(error.mock.calls.at(-1)?.[0]);
+    expect(line).toContain('POST /api/v1/x reqId=req-1');
+    expect(line).not.toContain('q=1');
   });
 });

@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import type { ApiErrorBody } from '../interfaces/api-error.interface.js';
 import { AppException } from '../exceptions/app.exception.js';
 
@@ -48,12 +48,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('Exceptions');
 
   catch(exception: unknown, host: ArgumentsHost) {
-    const res = host.switchToHttp().getResponse<Response>();
-    const { status, body } = this.toResponse(exception);
+    const http = host.switchToHttp();
+    const res = http.getResponse<Response>();
+    const { status, body } = this.toResponse(
+      exception,
+      http.getRequest<Request>(),
+      res,
+    );
     res.status(status).json(body);
   }
 
-  private toResponse(exception: unknown): {
+  private toResponse(
+    exception: unknown,
+    req?: Request,
+    res?: Response,
+  ): {
     status: number;
     body: ApiErrorBody;
   } {
@@ -71,8 +80,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
       return { status, body: { error: fallback } };
     }
+    // The request id (also sent back in X-Request-Id) links this stack trace to the request log line.
+    const requestId = (res?.locals?.requestId as string | undefined) ?? '-';
     this.logger.error(
-      exception instanceof Error ? exception.stack : String(exception),
+      `${req?.method ?? ''} ${req?.originalUrl?.split('?')[0] ?? ''} reqId=${requestId}\n${
+        exception instanceof Error ? exception.stack : String(exception)
+      }`,
     );
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
