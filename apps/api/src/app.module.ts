@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClockModule } from './common/clock/clock.js';
 import { validateEnv, type Env } from './config/env.validation.js';
 import { databaseOptions } from './database/database.config.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { RoomsModule } from './modules/rooms/rooms.module.js';
+import { ReservationsModule } from './modules/reservations/reservations.module.js';
+import { AvailabilityModule } from './modules/availability/availability.module.js';
 
 @Module({
   imports: [
@@ -28,9 +31,12 @@ import { RoomsModule } from './modules/rooms/rooms.module.js';
         autoLoadEntities: true,
       }),
     }),
+    ClockModule,
     UsersModule,
     AuthModule,
     RoomsModule,
+    ReservationsModule,
+    AvailabilityModule,
   ],
 })
 export class AppModule {}
